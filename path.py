@@ -9,7 +9,7 @@ from KUKA import KUKA
 from Pygame_GUI.Screen import Screen
 from RRT import RRT
 from map_plotter import MapPlotter
-
+#from Dijkstra import Dijkstra
 
 class RRT_sim:
     def __init__(self, plotter=None, robot=None):
@@ -211,8 +211,8 @@ class RRT_sim:
 robot = KUKA('192.168.88.25', ros=False, offline=True)
 
 new_map = MapPlotter(None)
-map_thr = thr.Thread(target=new_map.create_map, args=())
-map_thr.start()
+# map_thr = thr.Thread(target=new_map.create_map, args=())
+# map_thr.start()
 
 rrt_sim = RRT_sim(new_map, robot)
 rrt_sim.start()
