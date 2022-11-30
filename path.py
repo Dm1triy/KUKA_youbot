@@ -9,7 +9,7 @@ from KUKA import KUKA
 from Pygame_GUI.Screen import Screen
 from RRT import RRT
 from map_plotter import MapPlotter
-#from Dijkstra import Dijkstra
+from Dijkstra import Dijkstra
 
 class RRT_sim:
     def __init__(self, plotter=None, robot=None):
@@ -151,8 +151,8 @@ class RRT_sim:
             n = self.rrt.graph[i][0]
             pg.draw.aaline(self.screen, (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.nodes[i])),
                            list(map(lambda x: x * self.map_k, self.rrt.nodes[n])))
-        pg.draw.circle(self.screen, (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.random_point)),
-                       5)
+        #pg.draw.circle(self.screen, (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.random_point)),
+        #               5)
 
     def draw_path(self):
         if self.rrt.dist_reached:
@@ -172,7 +172,7 @@ class RRT_sim:
         self.bool_map = bool_map == False
 
     def init_rrt(self):
-        self.rrt = RRT(start_point=np.array(self.start_point), end_point=np.array(self.end_point),
+        self.rrt = Dijkstra(start_point=np.array(self.start_point), end_point=np.array(self.end_point),
                        bin_map=self.bool_map)
 
     def start(self):
