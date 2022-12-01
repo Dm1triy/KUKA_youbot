@@ -10,6 +10,7 @@ from Pygame_GUI.Screen import Screen
 from RRT import RRT
 from map_plotter import MapPlotter
 from Dijkstra import Dijkstra
+from Bug import Bug
 
 class RRT_sim:
     def __init__(self, plotter=None, robot=None):
@@ -172,7 +173,7 @@ class RRT_sim:
         self.bool_map = bool_map == False
 
     def init_rrt(self):
-        self.rrt = Dijkstra(start_point=np.array(self.start_point), end_point=np.array(self.end_point),
+        self.rrt = Bug(start_point=np.array(self.start_point), end_point=np.array(self.end_point),
                        bin_map=self.bool_map)
 
     def start(self):

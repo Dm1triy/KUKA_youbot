@@ -1,5 +1,5 @@
 import numpy as np
-import math
+from math import hypot, cos, sin
 
 
 class Bug:
@@ -26,6 +26,7 @@ class Bug:
 
         self.dir_line = self.direction_line()
         self.unit_vec = self.unit_vector()
+        self.last_obs = [np.inf, np.inf]
 
         # 61x91
         map_shape = self.bool_map.shape
@@ -47,8 +48,39 @@ class Bug:
             print("No bin_map")
         assert bin_map.any()
 
-    def explore_obstacle(self):
+    def step(self):
+        if self.nodes[-1].all() == self.end_point.all():
+            self.dist_reached = True
+            return
+        if self.explore_obstacle:
+            self.explore_obs()
+        else:
+            self.move_forward()
 
+    def get_path(self):
+        node_num = self.end_node
+        self.path = []
+        while node_num != 0:
+            self.path.append(self.nodes[node_num])
+            node_num = self.graph[node_num][0]
+        self.path.append(self.nodes[node_num])
+        if not self.graph_printed:
+            self.graph_printed = True
+
+    def explore_obs(self):
+        curr_pos = self.nodes[-1]
+        obs_vec = [self.last_obs[0] - curr_pos[0], self.last_obs[1] - curr_pos[1]]
+        for i in range(8):
+            rot_m = self.get_rotation_matrix(i)
+            new_x, new_y = np.dot(rot_m, obs_vec)
+            if not self.is_obstacle(new_x, new_y):
+                self.nodes = np.append(self.nodes, [[new_x, new_y]], axis=0)
+                self.node_map[(new_x, new_y)] = 0
+                self.graph[self.node_num + 1] = [self.node_num, [], 0]
+                self.node_num += 1
+                self.last_obs = np.dot(self.get_rotation_matrix(i-1), obs_vec)
+                if self.dist_from_line(new_x, new_y) < 0.05:
+                    self.explore_obstacle = False
 
     def move_forward(self):
         new_x, new_y = np.round(self.nodes[-1] + self.unit_vec)
@@ -58,7 +90,13 @@ class Bug:
             self.graph[self.node_num+1] = [self.node_num, [], 0]
             self.node_num += 1
         else:
+            self.last_obs = [new_x, new_y]
             self.explore_obstacle = True
+
+    @staticmethod
+    def get_rotation_matrix(i):
+        theta = np.deg2rad(i * 45)
+        return np.array([[cos(theta), sin(theta)], [-sin(theta), cos(theta)]])
 
     def is_obstacle(self, x, y):
         return self.bool_map[x][y]
@@ -75,8 +113,8 @@ class Bug:
         return [a, b, c]
 
     def unit_vector(self):
-        return np.array([-self.dir_line[1], self.dir_line[0]])/math.hypot(self.dir_line[0], self.dir_line[1])
+        return np.array([-self.dir_line[1], self.dir_line[0]])/hypot(self.dir_line[0], self.dir_line[1])
 
     def dist_from_line(self, x, y):
         return (self.dir_line[0] * x + self.dir_line[1] * y + self.dir_line[2]) \
-               /math.hypot(self.dir_line[0], self.dir_line[1])
+               /hypot(self.dir_line[0], self.dir_line[1])
