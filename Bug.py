@@ -1,6 +1,7 @@
+import math
+
 import numpy as np
 from math import hypot, cos, sin
-
 
 class Bug:
     def __init__(self, start_point=None,
@@ -25,8 +26,8 @@ class Bug:
         self.node_num = 1
 
         self.dir_line = self.direction_line()
-        self.unit_vec = self.unit_vector()
         self.last_obs = [np.inf, np.inf]
+        self.target_distance = np.inf
 
         # 61x91
         map_shape = self.bool_map.shape
@@ -49,8 +50,10 @@ class Bug:
         assert bin_map.any()
 
     def step(self):
-        if self.nodes[-1].all() == self.end_point.all():
+        if self.nodes[-1][0] == self.end_point[0] and \
+                self.nodes[-1][1] == self.end_point[1]:
             self.dist_reached = True
+            self.end_node = self.node_num - 1
             return
         if self.explore_obstacle:
             self.explore_obs()
@@ -72,26 +75,34 @@ class Bug:
         obs_vec = [self.last_obs[0] - curr_pos[0], self.last_obs[1] - curr_pos[1]]
         for i in range(8):
             rot_m = self.get_rotation_matrix(i)
-            new_x, new_y = np.dot(rot_m, obs_vec)
+            unit_vec = np.round(np.dot(rot_m, obs_vec)).astype(int)
+            new_x, new_y = curr_pos + unit_vec
             if not self.is_obstacle(new_x, new_y):
                 self.nodes = np.append(self.nodes, [[new_x, new_y]], axis=0)
                 self.node_map[(new_x, new_y)] = 0
-                self.graph[self.node_num + 1] = [self.node_num, [], 0]
+                self.graph[self.node_num] = [self.node_num-1, [], 0]
                 self.node_num += 1
-                self.last_obs = np.dot(self.get_rotation_matrix(i-1), obs_vec)
-                if self.dist_from_line(new_x, new_y) < 0.05:
+                obs_vec = np.round(np.dot(self.get_rotation_matrix(i-1), obs_vec)).astype(int)
+                self.last_obs = curr_pos + obs_vec
+                if self.dist_from_line(new_x, new_y) < 0.5 and \
+                        self.closer_to_the_target(self.nodes[-1]):
                     self.explore_obstacle = False
+                return
 
     def move_forward(self):
-        new_x, new_y = np.round(self.nodes[-1] + self.unit_vec)
+        new_x, new_y = np.round(self.nodes[-1] + self.unit_vector()).astype(int)
         if not self.is_obstacle(new_x, new_y):
             self.nodes = np.append(self.nodes, [[new_x, new_y]], axis=0)
             self.node_map[(new_x, new_y)] = 0
-            self.graph[self.node_num+1] = [self.node_num, [], 0]
+            self.graph[self.node_num] = [self.node_num-1, [], 0]
             self.node_num += 1
         else:
             self.last_obs = [new_x, new_y]
+            self.target_distance = np.linalg.norm(self.nodes[-1] - self.end_point)
             self.explore_obstacle = True
+
+    def closer_to_the_target(self, point):
+        return self.target_distance > np.linalg.norm(point - self.end_point)
 
     @staticmethod
     def get_rotation_matrix(i):
@@ -113,7 +124,11 @@ class Bug:
         return [a, b, c]
 
     def unit_vector(self):
-        return np.array([-self.dir_line[1], self.dir_line[0]])/hypot(self.dir_line[0], self.dir_line[1])
+        vec = self.end_point - self.nodes[-1]
+        u_vec = vec/hypot(vec[0], vec[1])
+        norm_vec = np.array([-u_vec[1], u_vec[0]]) * self.dist_from_line(self.nodes[-1][0], self.nodes[-1][1])
+        return np.round(norm_vec + u_vec).astype(int)
+
 
     def dist_from_line(self, x, y):
         return (self.dir_line[0] * x + self.dir_line[1] * y + self.dir_line[2]) \
