@@ -8,6 +8,8 @@ import scipy
 from KUKA import KUKA
 from Pygame_GUI.Screen import Screen
 from RRT import RRT
+from Bug import Bug
+from Dijkstra import Dijkstra
 from map_plotter import MapPlotter
 
 
@@ -18,7 +20,7 @@ class RRT_sim:
         self.screen_size = 900
 
         self.discrete = 20
-        self.robot_radius = 17
+        self.robot_radius = 9
         self.screen_obj = Screen(self.screen_size, self.screen_size)
         self.screen = self.screen_obj.screen
         self.move_speed_val = 0.5
@@ -176,26 +178,40 @@ class RRT_sim:
             n = self.rrt.graph[i][0]
             pg.draw.aaline(self.screen, (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.nodes[i])),
                            list(map(lambda x: x * self.map_k, self.rrt.nodes[n])))
-        pg.draw.circle(self.screen, (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.random_point)),
-                       5)
+        #pg.draw.circle(self.screen, (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.random_point)),
+        #               5)
 
     def draw_path(self):
         pg.draw.lines(self.screen, (255, 0, 0), False,
                         [[*i] for i in list(map(lambda x: x * self.map_k, self.rrt.path))], 5)
 
     def apply_robot_radius_to_map(self):
-        n_mask = scipy.ndimage.generate_binary_structure(len(self.map_shape), 3)
-        neighborhood = np.zeros((self.robot_radius, self.robot_radius))
-        neighborhood[self.robot_radius // 2][self.robot_radius // 2] = 1
-        neighborhood = scipy.ndimage.binary_dilation(neighborhood, structure=n_mask).astype(n_mask.dtype)
-        for i in range(int(self.robot_radius // 2 / 3)):
-            neighborhood = scipy.ndimage.binary_dilation(neighborhood, structure=neighborhood).astype(n_mask.dtype)
-        bool_map = np.array(self.nav_map).astype(np.uint8) == 0
-        bool_map = scipy.ndimage.binary_erosion(bool_map, structure=neighborhood, border_value=1)
+        cross_mask = scipy.ndimage.generate_binary_structure(len(self.map_shape), 1)
+        square_mask = scipy.ndimage.generate_binary_structure(len(self.map_shape), 1)
+        # robot radius about 7 discretes if discrete = 5sm
+        robot_mask = np.zeros((2 * self.robot_radius, 2 * self.robot_radius))
+        robot_mask[self.robot_radius][self.robot_radius] = 1
+        robot_mask = scipy.ndimage.binary_dilation(robot_mask, structure=cross_mask).astype(cross_mask.dtype)
+        for i in range(self.robot_radius):
+            robot_mask = scipy.ndimage.binary_dilation(robot_mask, structure=square_mask).astype(square_mask.dtype)
+        # nav_map is array where 0 = obstacle, 1 = free space
+        bool_map = np.array(self.nav_map).astype(np.uint8) == 0  # True if obstacle
+        bool_map = scipy.ndimage.binary_erosion(bool_map, structure=robot_mask, border_value=1)
         self.bool_map = bool_map == False
 
+    # def apply_robot_radius_to_map(self):
+    #     n_mask = scipy.ndimage.generate_binary_structure(len(self.map_shape), 1)
+    #     neighborhood = np.zeros((self.robot_radius, self.robot_radius))
+    #     neighborhood[self.robot_radius // 2][self.robot_radius // 2] = 1
+    #     neighborhood = scipy.ndimage.binary_dilation(neighborhood, structure=n_mask).astype(n_mask.dtype)
+    #     for i in range(int(self.robot_radius // 2 / 3)):
+    #         neighborhood = scipy.ndimage.binary_dilation(neighborhood, structure=neighborhood).astype(n_mask.dtype)
+    #     bool_map = np.array(self.nav_map).astype(np.uint8) == 0
+    #     bool_map = scipy.ndimage.binary_erosion(bool_map, structure=neighborhood, border_value=1)
+    #     self.bool_map = bool_map == False
+
     def init_rrt(self):
-        self.rrt = RRT(start_point=np.array(self.start_point), end_point=np.array(self.end_point),
+        self.rrt = Bug(start_point=np.array(self.start_point), end_point=np.array(self.end_point),
                        bin_map=self.bool_map)
 
 
@@ -238,11 +254,11 @@ class RRT_sim:
 
                         if curr_point < len(self.rrt.path)+1:
                             prec = 0.005
-                            k=1
+                            k=2
                             goal = self.plotter.scale_to_m(*self.rrt.path[-curr_point])
                         else:
                             prec = 0.005
-                            k=1
+                            k=2
 
                         if self.drive and not self.robot.going_to_target_pos:
                             self.robot.go_to(*goal, prec=prec, k=k)
@@ -263,7 +279,7 @@ class RRT_sim:
         pg.quit()
 
 
-robot = KUKA('192.168.88.25', ros=False, offline=False)
+robot = KUKA('192.168.88.21', ros=False, offline=False)
 
 new_map = MapPlotter(robot)
 map_thr = thr.Thread(target=new_map.create_map, args=())

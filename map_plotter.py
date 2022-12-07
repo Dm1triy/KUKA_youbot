@@ -71,11 +71,11 @@ class MapPlotter:
             cent_y = cent_y - 0.3 * math.cos(ang + math.pi / 2)
             cent_x = cent_x + 0.3 * math.sin(ang + math.pi / 2)
 
-            for i in range(40, len(lidar)-40):
+            for i in range(len(lidar)):
                 lid_ang = i * math.radians(240) / len(lidar) - ang - math.radians(30)
                 lid_dist = lidar[i]
 
-                if lid_dist > 5:
+                if lid_dist > 5 or lid_dist < 0.5:
                     continue
                 for lid_dist_cl in range(int(self.discrete * lid_dist)):
                     ox = cent_x + lid_dist_cl / self.discrete * math.sin(lid_ang)
