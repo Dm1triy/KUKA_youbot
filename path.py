@@ -69,6 +69,23 @@ class RRT_sim:
             pass
         self.map_arr = np.copy(self.plotter.map_background)
         self.nav_map = np.copy(self.plotter.map_arr)
+
+        # ############### noise cancelling v1
+        # noise_filter = scipy.ndimage.generate_binary_structure(2, 1)
+        # self.nav_map = scipy.ndimage.binary_erosion(self.nav_map, structure=noise_filter,
+        #                                             border_value=1).astype(self.nav_map.dtype)
+        # expand_filter = scipy.ndimage.generate_binary_structure(2, 2)
+        # self.nav_map = scipy.ndimage.binary_dilation(self.nav_map, structure=expand_filter).astype(self.nav_map.dtype)
+        # ##############################################################################################################
+
+        ############### noise cancelling v2
+        noise_filter = np.ones((1, 3))
+        noise_filter[0][0] = 0
+        self.nav_map = scipy.ndimage.binary_erosion(self.nav_map, structure=noise_filter,
+                                                    border_value=1).astype(self.nav_map.dtype)
+        self.nav_map = scipy.ndimage.binary_dilation(self.nav_map, structure=noise_filter).astype(self.nav_map.dtype)
+        #######################################################################################################
+
         self.map_shape = self.nav_map.shape
         self.map_k = self.screen_size // max(self.map_shape[0], self.map_shape[1])
         self.start_point = np.array(self.plotter.scale_to_arr(*self.plotter.pos[:-1]))
@@ -192,7 +209,7 @@ class RRT_sim:
         robot_mask = np.zeros((2 * self.robot_radius, 2 * self.robot_radius))
         robot_mask[self.robot_radius][self.robot_radius] = 1
         robot_mask = scipy.ndimage.binary_dilation(robot_mask, structure=cross_mask).astype(cross_mask.dtype)
-        for i in range(self.robot_radius):
+        for i in range(self.robot_radius+1):
             robot_mask = scipy.ndimage.binary_dilation(robot_mask, structure=square_mask).astype(square_mask.dtype)
         # nav_map is array where 0 = obstacle, 1 = free space
         bool_map = np.array(self.nav_map).astype(np.uint8) == 0  # True if obstacle
