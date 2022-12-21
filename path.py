@@ -79,11 +79,11 @@ class RRT_sim:
         # ##############################################################################################################
 
         ############### noise cancelling v2
-        noise_filter = np.ones((1, 3))
-        noise_filter[0][0] = 0
-        self.nav_map = scipy.ndimage.binary_erosion(self.nav_map, structure=noise_filter,
-                                                    border_value=1).astype(self.nav_map.dtype)
-        self.nav_map = scipy.ndimage.binary_dilation(self.nav_map, structure=noise_filter).astype(self.nav_map.dtype)
+        # noise_filter = np.ones((1, 3))
+        # noise_filter[0][0] = 0
+        # self.nav_map = scipy.ndimage.binary_erosion(self.nav_map, structure=noise_filter,
+        #                                             border_value=1).astype(self.nav_map.dtype)
+        # self.nav_map = scipy.ndimage.binary_dilation(self.nav_map, structure=noise_filter).astype(self.nav_map.dtype)
         #######################################################################################################
 
         self.map_shape = self.nav_map.shape
