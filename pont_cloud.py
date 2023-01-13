@@ -35,10 +35,10 @@ class PointCloud:
                 self.peak_coords[0].append(i)
                 self.peak_coords[1] = np.append(self.peak_coords[1], [self.xy_form[self.peaks[i][0][1]]], axis=0)
 
-    def icp(self, other):  # icp
-
-
-        '''if self.peak_coords[1].any() and other.peak_coords[1].any():
+    def icp(self, other, /, full=False):  # icp
+        if full:
+            return self._icp(self.xy_form, other.xy_form)
+        if self.peak_coords[1].any() and other.peak_coords[1].any():
             neighbours = np.array([*self.nearest_neighbor([self.peak_coords[1]], other.peak_coords[1]),
                                    range(len(self.peak_coords[1]))]).T
             neighbours = sorted(neighbours, key=lambda x: x[0])
@@ -72,7 +72,7 @@ class PointCloud:
                 icp_out = self._icp(obj_self, obj_other)
 
                 # weight_vector=[weight_vector])
-                if False:
+                '''if False:
                     corrected_odom = undo_lidar(np.dot(icp_out[0], homogen_matrix_from_pos(self.odom, True)))
                     corr = self.split_objects(pos_vector_from_homogen_matrix(corrected_odom))
 
@@ -93,11 +93,11 @@ class PointCloud:
 
                     pyplot.axis('equal')
                     pyplot.legend(numpoints=1)
-                    pyplot.show()
+                    pyplot.show()'''
                 return icp_out
 
-        return np.array([[1, 0, 1e15], [0, 1, 1e15], [0, 0, 1]]), None, 0, 1e15'''
-        return self._icp(self.xy_form, other.xy_form)
+        return np.array([[1, 0, 1e15], [0, 1, 1e15], [0, 0, 1]]), None, 0, 1e15
+
 
     def get_obj(self, ind):
         ind = int(ind)
@@ -346,7 +346,7 @@ class PointCloud:
         dist, indexes = A_tree.query(src)
         return dist.ravel(), indexes.ravel()
 
-    def _icp(self, A, B, init_pose=None, max_iterations=10, tolerance=0.01, /, weight_vector=None):
+    def _icp(self, A, B, init_pose=None, max_iterations=10, tolerance=0.1, /, weight_vector=None):
         # print(A.shape, B.shape)
         # assert A.shape == B.shape
         # get number of dimensions

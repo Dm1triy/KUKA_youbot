@@ -70,7 +70,7 @@ class SLAM:
         self.queue_lock.acquire()
         self.node_queue.append([self.odom, self.point_cloud, self.path_length])
         self.queue_lock.release()
-        self.last_path = self.path_length
+
     def process_SLAM(self):
         self.point_cloud = PointCloud([self.odom, self.lidar])
         x, y, r = self.odom
@@ -87,55 +87,59 @@ class SLAM:
             #else:
             #    nn = int(nn)
             for i in range(len(self.pose_graph) - 1, len(self.pose_graph)-5, -1):
-                icp_out = self.pose_graph[-1, "object"].icp(self.pose_graph[i, "object"])
+                icp_out = self.pose_graph[-1, "object"].icp(self.point_cloud)
                 err = pos_vector_from_homogen_matrix(icp_out[0])
                 if icp_out and icp_out[-1] < 0.03 and err[0] ** 2 + err[1] ** 2 < 1 and abs(err[2]) < 0.7:
                     if self.path_length - self.last_path > 0.7:
+                        self.last_path = self.path_length
                         self.add_curr_to_queue()
                         print("no neighbours")
                     return
         if self.path_length - self.last_path > 1:
+            self.last_path = self.path_length
             self.add_curr_to_queue()
             print("too long")
 
     def SLAM_add_edges(self):
-        self.stored_detected_corners = [None, np.array(False)]
+        self.all_detected_corners = [None, np.array(False)]
         self.pose_graph.update(0)
         for i in range(len(self.pose_graph)):
             self.pose_graph.update(i)
-        print("now cheking: ")
+        print("Glogal ICP: ")
         for i in range(len(self.pose_graph)-1, -1, -1):
-
+            print(i)
             for j in range(0, i):
-                print(i, j)
-                icp_out = self.pose_graph[i, "object"].icp(self.pose_graph[j, "object"])
-                corrected_odom = undo_lidar(
-                    np.dot(icp_out[0], self.pose_graph[i, "lidar_mat_pos"]))
-                if icp_out and icp_out[-1] < 0.04:
-                    self.pose_graph.add_edge(j, corrected_odom, i, np.array([[5, 0, 0], [0, 5, 0], [0, 0, 5]]))
-                    #if abs(i-j)>10:
-                    #    self.plot_icp(corrected_odom, j, i)
-                    break
-
-        '''if point_cloud.peak_coords[0]:
-                nn = self.check_existing_corners(point_cloud, optimizing=True)
+                if self.pose_graph[i, "object"].peak_coords[0] and len(self.pose_graph[i, "object"].peak_coords[0]) > 3:
+                    icp_out = self.pose_graph[i, "object"].icp(self.pose_graph[j, "object"], full=True)
+                    corrected_odom = undo_lidar(
+                        np.dot(icp_out[0], self.pose_graph[i, "lidar_mat_pos"]))
+                    if icp_out and icp_out[-1] < 0.04:
+                        self.pose_graph.add_edge(j, corrected_odom, i, np.array([[5, 0, 0], [0, 5, 0], [0, 0, 5]]))
+                        #if abs(i-j)>10:
+                        #    self.plot_icp(corrected_odom, j, i)
+                        break
+        print("local ICP")
+        for i in range(len(self.pose_graph)):
+            if self.pose_graph[i, "object"].peak_coords[0]:
+                nn = self.check_existing_corners(self.pose_graph[i, "object"])
                 if not nn:
-                    self.check_existing_corners(point_cloud, node_ind=i, add=True, optimizing=True)
+                    self.check_existing_corners(self.pose_graph[i, "object"], node_ind=i, add=True)
                     continue
                 else:
                     nn = int(nn)
                 self.pose_graph.update(nn)
-                icp_out = point_cloud.icp(self.pose_graph[nn, "object"])
+                icp_out = self.pose_graph[i, "object"].icp(self.pose_graph[nn, "object"])
                 err = pos_vector_from_homogen_matrix(icp_out[0])
                 corrected_odom = undo_lidar(
                     np.dot(icp_out[0], self.pose_graph[i, "lidar_mat_pos"]))
 
-                if icp_out and icp_out[-1] < 0.03 and err[0] ** 2 + err[1] ** 2 < 1 and abs(err[2]) < 0.7:
+                if icp_out and icp_out[-1] < 0.03 and err[0] ** 2 + err[1] ** 2 < 3.5 and abs(err[2]) < 0.7:
                     if nn < i and not i in self.pose_graph[nn, "children_id"]:
+                        print(123333)
                         self.pose_graph.add_edge(nn, corrected_odom, i,
                                                  np.array([[5, 0, 0], [0, 5, 0], [0, 0, 5]]))
                 else:
-                    self.check_existing_corners(point_cloud, node_ind=i, add=True, optimizing=True)'''
+                    self.check_existing_corners(self.pose_graph[i, "object"], node_ind=i, add=True)
 
     def plot_icp(self, corrected_odom, j, i):
         corrected_odom = homogen_matrix_from_pos(pos_vector_from_homogen_matrix(corrected_odom), True)
@@ -158,11 +162,8 @@ class SLAM:
         pyplot.legend(numpoints=1)
         pyplot.show()
 
-    def check_existing_corners(self, object, /, node_ind=None, add=False, optimizing=False):
-        if optimizing:
-            corners = self.stored_detected_corners
-        else:
-            corners = self.all_detected_corners
+    def check_existing_corners(self, object, /, node_ind=None, add=False):
+        corners = self.all_detected_corners
         if corners[1].any():
             nodes_tree = scipy.spatial.cKDTree(corners[1])
             res = np.array(nodes_tree.query(object.peak_coords[1])).T
@@ -170,22 +171,14 @@ class SLAM:
             if add:
                 peak_coords = object.peak_coords[1]
                 ind = [node_ind] * len(peak_coords)
-                if optimizing:
-                    for i in ind:
-                        self.stored_detected_corners[0].append(i)
-                    self.stored_detected_corners[1] = np.append(self.stored_detected_corners[1], peak_coords, axis=0)
-                else:
-                    for i in ind:
-                        self.all_detected_corners[0].append(i)
-                    self.all_detected_corners[1] = np.append(self.all_detected_corners[1], peak_coords, axis=0)
+                for i in ind:
+                    self.all_detected_corners[0].append(i)
+                self.all_detected_corners[1] = np.append(self.all_detected_corners[1], peak_coords, axis=0)
             return corners[0][int(res[0][1])]
         elif node_ind:
             peak_coords = object.peak_coords[1]
             ind = [node_ind] * len(peak_coords)
-            if optimizing:
-                self.stored_detected_corners = [ind, peak_coords]
-            else:
-                self.all_detected_corners = [ind, peak_coords]
+            self.all_detected_corners = [ind, peak_coords]
         return None
 
     def error_func(self, i, Xi, j, Xj):

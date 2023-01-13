@@ -22,16 +22,20 @@ class RRT_sim:
         self.start_point = np.array(False)
         self.nav_map = np.array(False)
         self.map_arr = np.array(False)
-        # self.manual_map()
+
 
         self.rrt_state = 0
+        self.rrt_thr = thr.Thread(target=self.pathfinding_rrt, args=())
+
         self.slam = SLAM(self.robot)
         self.slam_thr = thr.Thread(target=self.slam.run, args=())
         #self.slam_thr.start()
 
+        self.manual_map()
+
     # make map
     def manual_map(self):
-        self.map_shape = (60, 90)
+        self.map_shape = (300, 450)
         self.map_k = self.screen_size // max(self.map_shape[0], self.map_shape[1])
         self.map_arr = np.array([[[255, 255, 255]] * (self.map_shape[1] + 1)] * (self.map_shape[0] + 1)).astype(
             np.uint8)
@@ -53,7 +57,7 @@ class RRT_sim:
                 else:
                     nav_map.append(1)
         self.nav_map = np.array(nav_map)
-        self.nav_map = self.nav_map.reshape(len(self.map_arr), len(self.map_arr[0]))
+        self.slam.bool_map = self.nav_map.reshape(len(self.map_arr), len(self.map_arr[0]))
 
     def m_to_arr(self, coords):
         x, y = coords
@@ -114,6 +118,8 @@ class RRT_sim:
         if pg.K_z in pressed_keys:
             self.step = True
             self.flow = False
+            if not self.rrt_state:
+                self.rrt_thr.start()
         elif pg.K_x in pressed_keys:
             self.flow = True
             self.step = True
@@ -132,19 +138,20 @@ class RRT_sim:
         if self.screen_obj.mouse_clicked:
             self.screen_obj.mouse_clicked = False
             if not self.start_point.any():
-                self.start_point = np.array(self.screen_to_arr(self.screen_obj.mouse_pos))
-                print("start point:", self.start_point)
+                self.start_point = np.array([self.screen_to_arr(self.screen_obj.mouse_pos)]).astype(int)
+                print("start point:", self.screen_obj.mouse_pos)
             elif not self.end_point.any():
-                self.end_point = np.array(self.screen_to_arr(self.screen_obj.mouse_pos))
+                self.end_point = np.array(self.screen_to_arr(self.screen_obj.mouse_pos)).astype(int)
                 print("end point:", self.end_point)
 
     def draw_map(self):
         if self.map_arr.any():
-            map_img = pg.transform.scale(pg.surfarray.make_surface(self.slam.map() * 255),
+            map_img = pg.transform.scale(pg.surfarray.make_surface((self.slam.map() * -1 + 1) * 255),
                                          (self.map_shape[0] * self.map_k, self.map_shape[1] * self.map_k))
             self.screen.blit(map_img, (0, 0))
         if self.start_point.any():
-            pg.draw.circle(self.screen, (255, 0, 0), list(map(lambda x: x * self.map_k, self.start_point)), 5)
+            for sp in self.start_point:
+                pg.draw.circle(self.screen, (255, 0, 0), list(map(lambda x: x * self.map_k, sp)), 5)
         if self.end_point.any():
             pg.draw.line(self.screen, (0, 102, 51), [list(map(lambda x: x * self.map_k, self.end_point))[0] - 10,
                                                      list(map(lambda x: x * self.map_k, self.end_point))[1] - 10],
@@ -165,7 +172,7 @@ class RRT_sim:
         for j in range(self.rrt.nodes.shape[0]):
             i = self.rrt.nodes[j]
             pg.draw.circle(self.screen, (0, 0, 255), list(map(lambda x: x * self.map_k, i)), 5)
-        pg.draw.circle(self.screen, (255, 0, 0), list(map(lambda x: x * self.map_k, self.start_point)), 5)
+        #pg.draw.circle(self.screen, (255, 0, 0), list(map(lambda x: x * self.map_k, self.start_point)), 5)
 
     def draw_edges(self):
         for i in range(1, self.rrt.node_num):
@@ -191,7 +198,7 @@ class RRT_sim:
         self.bool_map = bool_map == False
 
     def init_rrt(self):
-        self.rrt = RRT(start_point=np.array(self.start_point), end_point=np.array(self.end_point),
+        self.rrt = RRT(start_point=self.start_point, end_point=np.array(self.end_point),
                        bin_map=self.bool_map)
         self.rrt.step()
 
@@ -201,29 +208,29 @@ class RRT_sim:
             self.grab_map()
             self.draw_map()
             self.draw_curr_pos()
-            self.screen_obj.step()
 
             if not self.drive:
                 self.robot.going_to_target_pos = False
-            if self.rrt_state > 0:
+            if self.rrt_state > 1:
                 self.draw_nodes()
                 self.draw_edges()
-            if self.rrt_state == 2:
+            if self.rrt_state == 3:
                 self.rrt.get_path()
                 self.draw_path()
             self.screen_obj.step()
         self.screen_obj.end()
 
     def pathfinding_rrt(self):
+        self.rrt_state = 1
         self.apply_robot_radius_to_map()
         self.init_rrt()
-        self.rrt_state = 1
+        self.rrt.step()
+        self.rrt_state = 2
         while self.screen_obj.running:
             if self.step:
                 self.rrt.step()
             if self.rrt.dist_reached:
-                self.rrt_state = 2
-                break
+                self.rrt_state = 3
             if not self.flow:
                 self.step = False
 
@@ -292,8 +299,8 @@ class RRT_sim:
         pg.quit()
 
 
-robot = KUKA('192.168.88.21', ros=False, offline=False, read_depth=False, camera_enable=False, advanced=True,
-             log=("log/log5.txt", 10))
+robot = KUKA('192.168.88.21', ros=False, offline=True, read_depth=False, camera_enable=False, advanced=True)
+             #read_from_log=("log/log3.txt", 10))
 #log=("log/log3.txt", 10)
 rrt_sim = RRT_sim(robot)
 rrt_sim.main_thr()
