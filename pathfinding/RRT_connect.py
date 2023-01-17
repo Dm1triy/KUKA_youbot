@@ -24,5 +24,6 @@ class RRT_connect():
         for i in range(self.points_num):
             self.trees[i].step()
             for j in range(self.points_num):
+                pass
 
 

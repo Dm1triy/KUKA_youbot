@@ -16,12 +16,12 @@ class NoCvMatSet(Exception):
     pass
 
 
-class Button:
+class Sprite:
     def __init__(self, par_surf, /,
                  x=0,
                  y=0,
-                 width=100,
-                 height=10,
+                 width=0,
+                 height=0,
                  func=lambda *args: args,
                  color=(100, 100, 100)):
         self.func = func
@@ -32,12 +32,13 @@ class Button:
         self.width = int(width * self.ps_width)
         self.height = int(height * self.ps_height)
         self.color = color
-        self.surf = pg.Surface((self.width, self.height))
-        self.surf.fill(self.color)
-        self.rect = par_surf.add_object(self)
+        if width != 0 and height != 0:
+            self.surf = pg.Surface((self.width, self.height))
+            self.surf.fill(self.color)
+            self.rect = par_surf.add_object(self)
 
     def pressed(self, *args):
-        self.func(args)
+        pass
 
     def dragged(self, *args):
         pass
@@ -49,67 +50,46 @@ class Button:
         pass
 
 
-class Text:
+class Button(Sprite):
+    def __init__(self, par_surf, /, **kwargs):
+        super().__init__(par_surf, **kwargs)
+
+    def pressed(self, *args):
+        self.func(args)
+
+
+class Text(Sprite):
     def __init__(self, par_surf, /,
-                 x=0,
-                 y=0,
                  inp_text=lambda *args: "your text",
                  font='serif',
-                 font_size=10,
-                 func=lambda *args: args,
-                 color=(255, 255, 255)):
-        self.func = func
-        self.par_surf = par_surf
-        self.ps_width, self.ps_height = par_surf.width, par_surf.height
-        self.x = int(x * self.ps_width)
-        self.y = int(y * self.ps_height)
+                 font_size=10, **kwargs):
+        super().__init__(par_surf, **kwargs)
         self.inp_text = inp_text
         self.text = inp_text
-        self.color = color
         self.text = pg.font.SysFont(font, int(font_size * self.ps_height / 500))
         self.surf = self.text.render(self.inp_text(), False, self.color)
         self.rect = par_surf.add_object(self)
 
+
     def pressed(self, *args):
         self.func(args)
-
-    def dragged(self, *args):
-        pass
-
-    def hover(self, *args):
-        pass
 
     def update(self):
         self.surf = self.text.render(self.inp_text(), False, self.color)
 
 
-class Slider:
+class Slider(Sprite):
     def __init__(self, par_surf, /,
-                 x=0,
-                 y=0,
-                 width=100,
-                 height=10,
-                 func=lambda *args: args,
-                 color=(100, 100, 100),
                  slider_color=(255, 255, 255),
                  min=0,
                  max=100,
-                 val=None):
-
-        self.par_surf = par_surf
-        self.func = func
-        self.ps_width, self.ps_height = par_surf.width, par_surf.height
-        self.x = int(x * self.ps_width)
-        self.y = int(y * self.ps_height)
-        self.width = int(width * self.ps_width)
-        self.height = int(height * self.ps_height)
-        self.color = color
+                 val=None, **kwargs):
+        super().__init__(par_surf, **kwargs)
         self.slider_color = slider_color
         self.min = min
         self.max = max
         self.slider_rad = self.height // 2
         self.slider_y = self.slider_rad
-        self.surf = pg.Surface((self.width, self.height))
 
         if val:
             self.val = val
@@ -120,22 +100,14 @@ class Slider:
 
         pg.draw.rect(self.surf, self.color, (0, 0, self.width, self.height), border_radius=self.height // 2)
         pg.draw.circle(self.surf, (255, 255, 255), (self.slider_x, self.slider_y), self.slider_rad)
-        # self.surf.fill(self.color)
-        self.rect = par_surf.add_object(self)
 
     def set_val(self, val):
         self.slider_x = convert_range(self.slider_rad, self.width - self.slider_rad, self.min, self.max, val)
-
-    def pressed(self, *args):
-        pass
 
     def dragged(self, *args):
         self.slider_x = range_cut(self.slider_rad, self.width - self.slider_rad, args[0])
         self.val = convert_range(self.min, self.max, self.slider_rad, self.width - self.slider_rad, self.slider_x)
         self.func(self.val)
-
-    def hover(self, *args):
-        pass
 
     def update(self):
         pg.draw.rect(self.surf, self.color, (0, 0, self.width, self.height), border_radius=self.height // 2)
@@ -174,7 +146,7 @@ class Mat:
         mat = self.cv_mat_stream()
         if self.width != 0 and self.height != 0:
             surf = pg.transform.flip(pg.transform.scale(pg.transform.rotate(pg.surfarray.make_surface(mat), -90),
-                                     (self.width, self.height)), 1, 0)
+                                                        (self.width, self.height)), 1, 0)
         else:
             surf = pg.transform.flip(pg.transform.rotate(pg.surfarray.make_surface(mat), -90), 1, 0)
         return surf

@@ -30,6 +30,7 @@ class Screen:
         pg.quit()
 
     def handle_events(self):
+        self.mouse_pos = pg.mouse.get_pos()
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 self.running = False
@@ -62,7 +63,7 @@ class Screen:
                 obj = self.objects[self.pressed_obj_ind]
                 obj.dragged(pg.mouse.get_pos()[0] - obj.x, pg.mouse.get_pos()[1] - obj.y)
             else:
-                self.mouse_pos = pg.mouse.get_pos()
+
                 if self.mouse_clicked == 1 or self.mouse_clicked == 2:
                     self.mouse_clicked = 2
                 else:

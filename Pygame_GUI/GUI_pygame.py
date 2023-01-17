@@ -6,7 +6,7 @@ import numpy as np
 
 from Pygame_GUI.Objects import *
 from Pygame_GUI.Screen import Screen
-from KUKA import KUKA
+from KUKA.KUKA import KUKA
 
 deb = True
 
