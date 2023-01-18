@@ -1,3 +1,4 @@
+import numpy as np
 import pygame as pg
 from Pygame_GUI.Space3D.matrix_functions import *
 from numba import njit
@@ -22,14 +23,15 @@ class Object3D:
         self.color_faces = [(pg.Color('orange'), face) for face in self.faces]
         self.movement_flag, self.draw_vertices = True, False
         self.label = ''
+        self.normals = [[self.face_normal(i)] for i in self.faces]
 
     def draw(self):
         self.screen_projection()
-        self.movement()
 
-    def movement(self):
-        if self.movement_flag:
-            self.rotate_y(-(pg.time.get_ticks() % 0.005))
+    def face_normal(self, face):
+        A = np.array(self.vertices[face[0]], self.vertices[face[1]])
+        B = np.array(self.vertices[face[0]], self.vertices[face[-1]])
+        return np.cross(A, B)
 
     def screen_projection(self):
         vertices = self.vertices @ self.render.camera.camera_matrix()
@@ -43,7 +45,10 @@ class Object3D:
             color, face = color_face
             polygon = vertices[face]
             if not any_func(polygon, self.render.h_width, self.render.h_height):
-                pg.draw.polygon(self.render.operating_surf, color, polygon, 1)
+                if len(polygon) < 3:
+                    pg.draw.aalines(self.render.operating_surf, color, False, polygon)
+                else:
+                    pg.draw.polygon(self.render.operating_surf, color, polygon)
                 if self.label:
                     text = self.font.render(self.label[index], True, pg.Color('white'))
                     self.render.operating_surf.blit(text, polygon[-1])
@@ -54,7 +59,6 @@ class Object3D:
                     pg.draw.circle(self.render.operating_surf, pg.Color('white'), vertex, 2)
 
     def translate(self, pos):
-        print(self.vertices)
         self.vertices = self.vertices @ translate(pos)
 
     def scale(self, scale_to):

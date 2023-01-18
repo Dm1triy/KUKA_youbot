@@ -16,11 +16,14 @@ class TimeRrtGui:
         self.space_3d = Space3D(self.screen, x=0, y=0, width=1, height=1)
         self.old_pressed_keys = []
         self.old_mouse_pos = [0, 0]
-        self.mouse_sense = 0.1
+        self.space_3d.add_object([(-1, -1, -1, 1), (1, -1, -1, 1), (-1, 1, -1, 1), (-1, -1, 1, 1),
+                                  (1, 1, -1, 1), (1, -1, 1, 1),
+                                  (-1, 1, 1, 1), (1, 1, 1, 1)],
+                                 [[0, 1, 4, 2], [3, 5, 7, 6], [0, 3, 5, 1], [6, 7, 4, 2], [1, 5, 7, 4], [0, 3, 6, 2]])
 
     def update_keys(self):
         presed_keys = self.screen.pressed_keys[:]
-        transition = np.array([0, 0, 0, 1.0])
+        transition = np.array([0, 0, 0, 0])
         if pg.K_a in presed_keys:
             transition[0] = -1
         if pg.K_d in presed_keys:
@@ -34,16 +37,10 @@ class TimeRrtGui:
         if pg.K_e in presed_keys:
             transition[1] = -1
 
-        mouse_pos = self.screen.mouse_pos[:]
-        rotation = (self.old_mouse_pos[0] - mouse_pos[0]) * self.mouse_sense, (
-                    self.old_mouse_pos[1] - mouse_pos[1]) * self.mouse_sense
-
         if self.old_pressed_keys != presed_keys:
-            self.space_3d.camera.control(transition=transition)
+            if self.space_3d.camera.mode == 0:
+                self.space_3d.camera.control(transition=transition)
             self.old_pressed_keys = presed_keys
-        if self.screen.mouse_clicked == 1:
-            self.space_3d.camera.control(rotation=rotation)
-        self.old_mouse_pos = mouse_pos
 
     def run(self):
         while self.screen.running:
