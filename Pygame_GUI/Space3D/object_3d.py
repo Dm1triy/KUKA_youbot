@@ -23,15 +23,15 @@ class Object3D:
         self.color_faces = [(pg.Color('orange'), face) for face in self.faces]
         self.movement_flag, self.draw_vertices = True, False
         self.label = ''
-        self.normals = [[self.face_normal(i)] for i in self.faces]
+        self.normals = [self.face_normal(i) for i in self.faces]
 
     def draw(self):
         self.screen_projection()
 
     def face_normal(self, face):
-        A = np.array(self.vertices[face[0]], self.vertices[face[1]])
-        B = np.array(self.vertices[face[0]], self.vertices[face[-1]])
-        return np.cross(A, B)
+        A = self.vertices[face[0]][:3] - self.vertices[face[1]][:3]
+        B = self.vertices[face[0]][:3] - self.vertices[face[-1]][:3]
+        return np.cross(A, B), self.vertices[face[0]][:3]
 
     def screen_projection(self):
         vertices = self.vertices @ self.render.camera.camera_matrix()
@@ -48,7 +48,9 @@ class Object3D:
                 if len(polygon) < 3:
                     pg.draw.aalines(self.render.operating_surf, color, False, polygon)
                 else:
-                    pg.draw.polygon(self.render.operating_surf, color, polygon)
+                    cam_vect = self.render.camera.transition[:3] - self.normals[index][1]
+                    if np.dot(self.normals[index][0], cam_vect) > 0:
+                        pg.draw.polygon(self.render.operating_surf, color, polygon, 1)
                 if self.label:
                     text = self.font.render(self.label[index], True, pg.Color('white'))
                     self.render.operating_surf.blit(text, polygon[-1])

@@ -32,9 +32,9 @@ class TimeRrtGui:
             transition[2] = 1
         if pg.K_s in presed_keys:
             transition[2] = -1
-        if pg.K_q in presed_keys:
+        if pg.K_LSHIFT in presed_keys:
             transition[1] = 1
-        if pg.K_e in presed_keys:
+        if pg.K_LCTRL in presed_keys:
             transition[1] = -1
 
         if self.old_pressed_keys != presed_keys:

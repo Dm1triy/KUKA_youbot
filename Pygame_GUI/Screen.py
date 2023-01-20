@@ -12,7 +12,7 @@ class Screen:
         self.pressed_keys = []
         self.mouse_wheel_pos = 0
         self.mouse_pos = [0,0]
-        self.mouse_clicked = 0
+        self.last_mouse_btn = 0
 
     def step(self):
         if self.running:
@@ -51,23 +51,20 @@ class Screen:
 
 
             elif event.type == pg.MOUSEBUTTONDOWN:
-                self.mouse_clicked = 1
+                self.last_mouse_btn = event.button
                 for obj_ind in range(len(self.objects)):
                     obj = self.objects[obj_ind]
                     if obj.rect.collidepoint(pg.mouse.get_pos()):
-                        obj.pressed(pg.mouse.get_pos()[0] - obj.x, pg.mouse.get_pos()[1] - obj.y)
+                        obj.pressed(pg.mouse.get_pos()[0] - obj.x, pg.mouse.get_pos()[1] - obj.y, self.last_mouse_btn)
                         self.pressed_obj_ind = obj_ind
             elif event.type == pg.MOUSEBUTTONUP:
+                obj = self.objects[self.pressed_obj_ind]
+                obj.released(pg.mouse.get_pos()[0] - obj.x, pg.mouse.get_pos()[1] - obj.y, self.last_mouse_btn)
                 self.pressed_obj_ind = None
             if self.pressed_obj_ind is not None:
                 obj = self.objects[self.pressed_obj_ind]
-                obj.dragged(pg.mouse.get_pos()[0] - obj.x, pg.mouse.get_pos()[1] - obj.y)
-            else:
+                obj.dragged(pg.mouse.get_pos()[0] - obj.x, pg.mouse.get_pos()[1] - obj.y, self.last_mouse_btn)
 
-                if self.mouse_clicked == 1 or self.mouse_clicked == 2:
-                    self.mouse_clicked = 2
-                else:
-                    self.mouse_clicked = 0
                 for obj_ind in range(len(self.objects)):
                     obj = self.objects[obj_ind]
                     if obj.rect.collidepoint(pg.mouse.get_pos()):

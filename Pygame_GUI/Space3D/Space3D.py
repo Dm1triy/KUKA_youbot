@@ -24,7 +24,7 @@ class Space3D:
         self.mouse_sense = 0.1
 
         self.func = func
-        self.get_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
+        #self.get_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
 
         self.camera = Camera(self, [0, 0, -55])
         self.projection = Projection(self)
@@ -42,7 +42,6 @@ class Space3D:
                 elif line.startswith('f'):
                     faces_ = line.split()[1:]
                     faces.append([int(face_.split('/')[0]) - 1 for face_ in faces_])
-        print(faces)
         return Object3D(self, vertex, faces)
 
     @property
@@ -66,11 +65,16 @@ class Space3D:
 
     def dragged(self, *args):
         self.is_pressed = True
-        rotation = (self.last_hover_pos[0] - args[0]) * self.mouse_sense, (
-                self.last_hover_pos[1] - args[1]) * self.mouse_sense
+        if args[2] == 1:
+            rotation = (self.last_hover_pos[0] - args[0]) * self.mouse_sense, (
+                    self.last_hover_pos[1] - args[1]) * self.mouse_sense, 0
+        else:
+            rotation = 0, 0, (self.last_hover_pos[0] - args[0]) * self.mouse_sense
+
+
         self.camera.control(rotation=rotation)
-        self.last_hover_pos = args
-        pass
+        self.last_hover_pos = args[:2]
+
 
     def hover(self, *args):
         self.last_hover_pos = args
@@ -79,3 +83,9 @@ class Space3D:
         self.last_mouse_wheel = self.par_surf.mouse_wheel_pos
         if self.camera.mode == 1:
             self.camera.control(transition=np.array([0, 0, -delta, 1]))
+
+    def released(self, *args):
+        pass
+
+    def clicked(self, *args):
+        pass

@@ -49,6 +49,12 @@ class Sprite:
     def update(self):
         pass
 
+    def released(self, *args):
+        pass
+
+    def clicked(self, *args):
+        pass
+
 
 class Button(Sprite):
     def __init__(self, par_surf, /, **kwargs):

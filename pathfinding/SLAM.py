@@ -1,6 +1,7 @@
 import numpy as np
+import threading as thr
 
-from import_libs import *
+from pathfinding.pose_graph import PoseGrah
 
 
 class SLAM:
