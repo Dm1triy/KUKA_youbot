@@ -22,11 +22,13 @@ class Space3D:
         self.last_mouse_wheel = 0
         self.is_pressed = False
         self.mouse_sense = 0.1
+        self.old_pressed_keys = []
 
         self.func = func
-        #self.get_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
+        # self.get_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
 
-        self.camera = Camera(self, [0, 0, -55])
+        self.camera = Camera(self, [0, 0, -10])
+        self.update_camera_pos = True
         self.projection = Projection(self)
         self.operating_surf = pg.Surface((self.width, self.height))
 
@@ -42,7 +44,7 @@ class Space3D:
                 elif line.startswith('f'):
                     faces_ = line.split()[1:]
                     faces.append([int(face_.split('/')[0]) - 1 for face_ in faces_])
-        return Object3D(self, vertex, faces)
+        return Solid3D(self, vertex, faces)
 
     @property
     def surf(self):
@@ -52,11 +54,12 @@ class Space3D:
         return self.operating_surf
 
     def add_object(self, vertices, faces):
-        self.all_obj.append(Object3D(self, vertices, faces))
-
+        self.all_obj.append(Solid3D(self, vertices, faces))
 
     def update(self):
-        self.camera.control()
+        if self.rect.collidepoint(pg.mouse.get_pos()):
+            self.camera.control()
+            self.update_keys()
         self.func(self.last_hover_pos, self.is_pressed)
 
     def pressed(self, *args):
@@ -71,21 +74,42 @@ class Space3D:
         else:
             rotation = 0, 0, (self.last_hover_pos[0] - args[0]) * self.mouse_sense
 
-
         self.camera.control(rotation=rotation)
         self.last_hover_pos = args[:2]
 
-
     def hover(self, *args):
-        self.last_hover_pos = args
+        self.last_hover_pos = args[:2]
         self.is_pressed = False
         delta = self.last_mouse_wheel - self.par_surf.mouse_wheel_pos
         self.last_mouse_wheel = self.par_surf.mouse_wheel_pos
         if self.camera.mode == 1:
-            self.camera.control(transition=np.array([0, 0, -delta, 1]))
+            self.camera.control(transition=np.array([0, 0, -delta, 0]))
 
     def released(self, *args):
         pass
 
     def clicked(self, *args):
         pass
+
+    def slip(self, *args):
+        self.camera.control(transition=np.array([0, 0, 0, 0]), rotation=[0, 0, 0])
+
+    def update_keys(self):
+        pressed_keys = self.par_surf.pressed_keys[:]
+        transition = np.array([0, 0, 0, 0])
+        if pg.K_a in pressed_keys:
+            transition[0] = -1
+        if pg.K_d in pressed_keys:
+            transition[0] = 1
+        if pg.K_w in pressed_keys:
+            transition[2] = 1
+        if pg.K_s in pressed_keys:
+            transition[2] = -1
+        if pg.K_LSHIFT in pressed_keys:
+            transition[1] = 1
+        if pg.K_LCTRL in pressed_keys:
+            transition[1] = -1
+        if self.old_pressed_keys != pressed_keys:
+            if self.camera.mode == 0:
+                self.camera.control(transition=transition)
+            self.old_pressed_keys = pressed_keys[:]
