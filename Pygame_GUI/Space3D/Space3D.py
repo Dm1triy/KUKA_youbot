@@ -23,9 +23,10 @@ class Space3D:
         self.is_pressed = False
         self.mouse_sense = 0.1
         self.old_pressed_keys = []
+        self.min_dist = 3
 
         self.func = func
-        # self.get_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
+        #self.get_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
 
         self.camera = Camera(self, [0, 0, -10])
         self.update_camera_pos = True
@@ -35,7 +36,7 @@ class Space3D:
         self.all_obj = [Axes(self)]
         self.rect = par_surf.add_object(self)
 
-    def get_object_from_file(self, filename):
+    def load_object_from_file(self, filename):
         vertex, faces = [], []
         with open(filename) as f:
             for line in f:
@@ -44,7 +45,7 @@ class Space3D:
                 elif line.startswith('f'):
                     faces_ = line.split()[1:]
                     faces.append([int(face_.split('/')[0]) - 1 for face_ in faces_])
-        return Solid3D(self, vertex, faces)
+        self.all_obj.append(Solid3D(self, vertex, faces))
 
     @property
     def surf(self):
@@ -56,7 +57,54 @@ class Space3D:
     def add_object(self, vertices, faces):
         self.all_obj.append(Solid3D(self, vertices, faces))
 
+
+    def render(self):
+        print("timer")
+        t = time.time()
+        for obj in self.all_obj:
+            obj.vert_to_global()
+            self.global_vert
+            self.global_face_centers
+            self.faces
+            self.color_faces
+            self.face_normals,
+            self.face_centers,
+
+        vertices = self.global_vert @ self.camera.camera_matrix()
+        vertices = vertices @ self.projection.projection_matrix
+
+        not_drawn_vertices_buff = np.zeros(len(vertices))
+        l = detect_not_drawn_vertices(vertices, self.min_dist, not_drawn_vertices_buff)
+        not_drawn_vertices = not_drawn_vertices_buff[:l]
+
+        vertices = vertices @ self.projection.to_screen_matrix
+        vertices = vertices[:, :2]
+        face_order = face_fast_sort(self.camera.position()[:3], self.global_face_centers)
+
+        polygons = np.zeros((len(self.faces), 3, 2)).astype(int)
+        colors = np.zeros((len(self.faces), 4))
+        print("1:", time.time() - t, end=" ")
+        t = time.time()
+        render_func(vertices,
+                    face_order[::-1],
+                    self.color_faces,
+                    self.faces,
+                    self.face_normals,
+                    self.face_centers,
+                    not_drawn_vertices,
+                    self.camera.position(),
+                    polygons,
+                    colors)
+        print("2:", time.time() - t, end=" ")
+        t = time.time()
+        for i in range(polygons.shape[0]):
+            color = pg.Color('white')
+            color.hsla = colors[i]
+            pg.draw.polygon(self.operating_surf, color, polygons[i])
+        print("3:", time.time() - t)
+
     def update(self):
+        self.render()
         if self.rect.collidepoint(pg.mouse.get_pos()):
             self.camera.control()
             self.update_keys()
