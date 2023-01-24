@@ -2,6 +2,7 @@ import pygame as pg
 from Pygame_GUI.Space3D.object_3d import *
 from Pygame_GUI.Space3D.camera import *
 from Pygame_GUI.Space3D.projection import *
+from Pygame_GUI.Space3D.fast_math import *
 
 
 class Space3D:
@@ -17,6 +18,8 @@ class Space3D:
         self.y = int(y * self.ps_height)
         self.width, self.height = int(width * self.ps_width), int(height * self.ps_height)
         self.h_width, self.h_height = self.width // 2, self.height // 2
+        self.color_mat = np.zeros((self.width, self.height, 3), dtype=np.uint32)
+        self.depth_mat = np.zeros((self.width, self.height), dtype=np.float32)
         self.func = lambda *args: args
         self.last_hover_pos = (0, 0)
         self.last_mouse_wheel = 0
@@ -33,7 +36,7 @@ class Space3D:
         self.projection = Projection(self)
         self.operating_surf = pg.Surface((self.width, self.height))
 
-        self.all_obj = [Axes(self)]
+        self.all_obj = []#Axes(self)]
         self.rect = par_surf.add_object(self)
 
     def load_object_from_file(self, filename):
@@ -49,62 +52,20 @@ class Space3D:
 
     @property
     def surf(self):
+        self.color_mat = np.zeros((self.width, self.height, 3), dtype=np.int32)
+        self.depth_mat = np.zeros((self.width, self.height), dtype=np.float64)
         self.operating_surf.fill(pg.Color('darkslategray'))
         for i in self.all_obj:
             i.draw()
-        return self.operating_surf
+        #return self.operating_surf
+        #maybe blit_array
+        return pg.surfarray.make_surface(self.color_mat)
 
     def add_object(self, vertices, faces):
         self.all_obj.append(Solid3D(self, vertices, faces))
 
 
-    def render(self):
-        print("timer")
-        t = time.time()
-        for obj in self.all_obj:
-            obj.vert_to_global()
-            self.global_vert
-            self.global_face_centers
-            self.faces
-            self.color_faces
-            self.face_normals,
-            self.face_centers,
-
-        vertices = self.global_vert @ self.camera.camera_matrix()
-        vertices = vertices @ self.projection.projection_matrix
-
-        not_drawn_vertices_buff = np.zeros(len(vertices))
-        l = detect_not_drawn_vertices(vertices, self.min_dist, not_drawn_vertices_buff)
-        not_drawn_vertices = not_drawn_vertices_buff[:l]
-
-        vertices = vertices @ self.projection.to_screen_matrix
-        vertices = vertices[:, :2]
-        face_order = face_fast_sort(self.camera.position()[:3], self.global_face_centers)
-
-        polygons = np.zeros((len(self.faces), 3, 2)).astype(int)
-        colors = np.zeros((len(self.faces), 4))
-        print("1:", time.time() - t, end=" ")
-        t = time.time()
-        render_func(vertices,
-                    face_order[::-1],
-                    self.color_faces,
-                    self.faces,
-                    self.face_normals,
-                    self.face_centers,
-                    not_drawn_vertices,
-                    self.camera.position(),
-                    polygons,
-                    colors)
-        print("2:", time.time() - t, end=" ")
-        t = time.time()
-        for i in range(polygons.shape[0]):
-            color = pg.Color('white')
-            color.hsla = colors[i]
-            pg.draw.polygon(self.operating_surf, color, polygons[i])
-        print("3:", time.time() - t)
-
     def update(self):
-        self.render()
         if self.rect.collidepoint(pg.mouse.get_pos()):
             self.camera.control()
             self.update_keys()

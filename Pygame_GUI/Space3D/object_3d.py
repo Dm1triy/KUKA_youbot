@@ -1,71 +1,8 @@
 import numpy as np
 import pygame as pg
 from Pygame_GUI.Space3D.matrix_functions import *
-from numba import njit
+from Pygame_GUI.Space3D.fast_math import *
 import time
-
-
-@njit(fastmath=True)
-def overlap(a, b):
-    for i in a:
-        for j in b:
-            if i == j:
-                return True
-    return False
-
-
-dtype = [('dist', float), ('ind', int)]
-
-
-@njit(fastmath=True)
-def face_fast_sort(ref, points):
-    return np.argsort(np.array(list([np.linalg.norm(ref - points[i][:3]) for i in range(len(points))])))
-
-
-@njit(fastmath=True)
-def detect_not_drawn_vertices(vertices, md, not_drawn_vertices):
-    l = 0
-    for v in range(len(vertices)):
-        if vertices[v][-1] < 0:
-            not_drawn_vertices[l] = v
-            l+=1
-            continue
-        else:
-            vertices[v] /= vertices[v][-1]
-            x, y, z = vertices[v][:3]
-            if not (md > x > -md and md > y > -md and md > z > -md):
-                not_drawn_vertices[l] = v
-                l+=1
-    return l
-
-
-@njit(fastmath=True)
-def render_func(vertices,
-                face_order,
-                color_faces,
-                faces,
-                face_normals,
-                face_centers,
-                not_drawn_vertices,
-                camera_position,
-                polygon_arr,
-                colors):
-    for i in range(len(face_order)):
-        index = face_order[i]
-        color = color_faces[index]
-        face = faces[index]
-        normal = face_normals[index]
-        corner = face_centers[index][:3]
-        # polygon = vertices[face]
-        if not (not_drawn_vertices.any() and overlap(face, not_drawn_vertices)):
-            if np.dot(normal, (camera_position[:3] - corner)) > 0:
-                lighting = (np.dot(normal, LIGHT_DIRECTION) /
-                            (np.linalg.norm(LIGHT_DIRECTION, ord=1) * np.linalg.norm(normal, ord=1)) + 1) / 2
-                polygon_arr[i, :] = vertices[face]
-                colors[i, :] = [*color[:2], int(100 * lighting ** 2), 100]
-
-
-LIGHT_DIRECTION = np.array([1, 1, 0]).astype(np.float64)
 
 
 class Object3D:
@@ -106,16 +43,16 @@ class Solid3D(Object3D):
     def __init__(self, render, vertices='', faces='', pos=None):
         super().__init__(render, pos)
         if vertices:
-            self.vertices = np.array([np.array(v) for v in vertices])
+            self.vertices = np.array([np.array(v) for v in vertices]).astype(np.float32)
         if faces:
             faces_ = []
             for face in faces:
                 for f_ in range(2, len(face)):
                     faces_.append([face[f_ - 1], face[f_], face[0]])
-            self.faces = np.array(faces_)
-        self.center_of_mass = np.mean(self.vertices, axis=0)
+            self.faces = np.array(faces_).astype(np.uint32)
+        self.center_of_mass = np.mean(self.vertices, axis=0).astype(np.float32)
         self.font = pg.font.SysFont('Arial', 30, bold=True)
-        self.color_faces = np.array([pg.Color('white').hsla for _ in self.faces])
+        self.color_faces = np.array([[255,255,255] for _ in self.faces]).astype(np.uint32)
         self.movement_flag, self.draw_vertices = True, False
         self.label = ''
 
@@ -128,8 +65,8 @@ class Solid3D(Object3D):
             B = self.vertices[face[0]][:3] - self.vertices[face[1]][:3]
             face_normals.append(np.cross(B, A))
             face_centers.append(center_of_face)
-        self.face_normals = np.array(face_normals).astype(np.float64)
-        self.face_centers = np.array(face_centers).astype(np.float64)
+        self.face_normals = np.array(face_normals).astype(np.float32)
+        self.face_centers = np.array(face_centers).astype(np.float32)
 
         self.vert_to_global()
         self.not_drawn_vertices = []
@@ -138,6 +75,31 @@ class Solid3D(Object3D):
         self.global_vert = np.copy(self.vertices)
 
     def draw(self):
+        #print("timer")
+        #t = time.time()
+        self.vert_to_global()
+        vertices = self.global_vert @ self.render.camera.camera_matrix()
+        vertices = vertices @ self.render.projection.projection_matrix
+
+
+        # vertices / z (delete not drawn vertices)
+        #vertices = vertices @ self.render.projection.to_screen_matrix  # map range (-1 - 1 to width_height)
+
+        #print("1:", time.time() - t, end=" ")
+        #t = time.time()
+
+        render_polygons(self.render.color_mat,
+                        self.render.depth_mat,
+                        vertices,
+                        self.faces,
+                        self.face_normals,
+                        self.face_centers,
+                        self.color_faces
+                        )
+        #print("2:", time.time() - t)
+        #t = time.time()
+
+    def draw_old(self):
         print("timer")
         t = time.time()
         self.vert_to_global()
@@ -154,7 +116,7 @@ class Solid3D(Object3D):
 
         polygons = np.zeros((len(self.faces), 3, 2)).astype(int)
         colors = np.zeros((len(self.faces), 4))
-        print("1:", time.time()-t, end=" ")
+        print("1:", time.time() - t, end=" ")
         t = time.time()
         render_func(vertices,
                     face_order[::-1],
@@ -178,7 +140,6 @@ class Solid3D(Object3D):
         self.global_vert = self.vertices @ self.transform
         self.global_center_of_mass = self.center_of_mass @ self.transform
         self.global_face_centers = self.face_centers @ self.transform
-
 
 
 class Axes(Solid3D):

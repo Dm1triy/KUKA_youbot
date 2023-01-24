@@ -17,7 +17,7 @@ class TimeRrtGui:
         self.space_3d = Space3D(self.screen, x=0, y=0, width=1, height=1)
         self.old_pressed_keys = []
         self.old_mouse_pos = [0, 0]
-        self.space_3d.load_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
+        #self.space_3d.load_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
         self.space_3d.add_object([(-1, -1, -1, 1), (1, -1, -1, 1), (-1, 1, -1, 1), (-1, -1, 1, 1),
                                   (1, 1, -1, 1), (1, -1, 1, 1),
                                   (-1, 1, 1, 1), (1, 1, 1, 1)],

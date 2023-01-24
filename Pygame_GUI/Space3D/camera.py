@@ -7,7 +7,7 @@ class Camera:
     def __init__(self, render, position):
         self.render = render
         self.init_pos = position
-        self.pos_serv = np.array([*position, 1.0])
+
         self.transition = np.array([0, 0, 0, 0])
         self.rotation = [0, 0]
         self.h_fov = math.pi / 3
@@ -19,6 +19,12 @@ class Camera:
         self.rotation_speed = 0.011
         self.mode = 1
         self.direction = np.eye(4)
+
+        # service variables
+        self.pos_serv = np.array([*position, 1.0])
+        self.pos_serv_1 = np.array([*position, 1.0])
+        self.camera_matrix_0_serv = np.eye(4)
+        self.camera_matrix_1_serv = np.eye(4)
 
     def reset(self):
         self.pos_serv = np.array([*self.init_pos, 1.0])
@@ -36,7 +42,7 @@ class Camera:
         if self.mode == 1:
             inv = -1
         if isinstance(transition, np.ndarray):
-            self.transition = transition*self.moving_speed
+            self.transition = transition * self.moving_speed
 
         if rotation:
             self.rotation = rotation
@@ -55,23 +61,29 @@ class Camera:
         if self.rotation[2]:
             self.direction = (rotate_z(self.rotation[2] * self.rotation_speed * inv)) @ self.direction
 
-    def camera_matrix(self):
-        if self.mode == 0:
-            return self.translate_matrix() @ self.direction.T
-        elif self.mode == 1:
-            return self.direction.T @ self.translate_matrix()
-
-    def translate_matrix(self):
+        # make matrix
         x, y, z, w = self.pos_serv
-        return np.array([
+        translate_matrix = np.array([
             [1, 0, 0, 0],
             [0, 1, 0, 0],
             [0, 0, 1, 0],
             [-x, -y, -z, 1]
         ])
+        dir_t = self.direction.T
+        if self.mode == 0:
+            self.camera_matrix_0_serv = translate_matrix @ dir_t
+        elif self.mode == 1:
+            self.camera_matrix_1_serv = dir_t @ translate_matrix
+            self.pos_serv_1 = dir_t @ self.pos_serv
+
+    def camera_matrix(self):
+        if self.mode == 0:
+            return self.camera_matrix_0_serv
+        elif self.mode == 1:
+            return self.camera_matrix_1_serv
 
     def position(self):
         if self.mode == 0:
             return self.pos_serv
         elif self.mode == 1:
-            return self.direction.T @ self.pos_serv
+            return self.pos_serv_1
