@@ -109,6 +109,7 @@ class KUKA:
         self.corr_arm_pos = [None, None]
         self.wheels_data = None
         self.wheels_data_lidar = None
+        self.trace = 0
 
         # for position correction
         self.wheels_old = None
@@ -391,6 +392,7 @@ class KUKA:
         delta_positionW2 = (wheel_positions[1] - last_wheel_positions[1])
         delta_positionW3 = (wheel_positions[2] - last_wheel_positions[2])
         delta_positionW4 = (wheel_positions[3] - last_wheel_positions[3])
+        self.trace += abs(delta_positionW1)+abs(delta_positionW2)+abs(delta_positionW3)+abs(delta_positionW4)
         deltaLongitudinalPos = (
                                            delta_positionW1 + delta_positionW2 + delta_positionW3 + delta_positionW4) * wheel_radius_per4
         deltaTransversalPos = (

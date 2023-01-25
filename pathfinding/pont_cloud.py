@@ -1,8 +1,39 @@
 import numpy as np
+import math
+import scipy
+from numba import njit
+from homogeneous_matrix import *
 
-from import_libs import *
+@njit(fastmath=True)
+def best_fit_transform(A, B, weight_vector=None):
+    n, m = A.shape
 
+    weights_sum = np.sum(weight_vector)
+    centroid_A = np.sum(np.multiply(A, weight_vector.T), axis=0) / weights_sum
+    centroid_B = np.sum(np.multiply(B, weight_vector.T), axis=0) / weights_sum
+    AA = A - centroid_A
+    BB = B - centroid_B
+    # print(BB)
 
+    # rotation matrix
+    H = np.dot(np.multiply(AA, weight_vector.T).T, np.multiply(BB, weight_vector.T))
+    U, S, Vt = np.linalg.svd(H)
+    R = np.dot(Vt.T, U.T)
+
+    # special reflection case
+    if np.linalg.det(R) < 0:
+        Vt[m - 1, :] *= -1
+        R = np.dot(Vt.T, U.T)
+
+    # translation
+    t = centroid_B.T - np.dot(R, centroid_A.T)
+
+    # homogeneous transformation
+    T = np.identity(m + 1)
+    T[:m, :m] = R
+    T[:m, m] = t
+
+    return T, R, t
 class PointCloud:
     def __init__(self, data):
         self.odom, self.lidar = data
@@ -373,9 +404,9 @@ class PointCloud:
 
             # compute the transformation between the current source and nearest destination points
             if weight_vector:
-                T, _, _ = self.best_fit_transform(src[:m, :].T, dst[:m, indices].T, np.array(weight_vector))
+                T, _, _ = best_fit_transform(src[:m, :].T, dst[:m, indices].T, np.array(weight_vector))
             else:
-                T, _, _ = self.best_fit_transform(src[:m, :].T, dst[:m, indices].T, np.ones(n).reshape(1, n))
+                T, _, _ = best_fit_transform(src[:m, :].T, dst[:m, indices].T, np.ones(n).reshape(1, n))
             # update the current source
             src = np.dot(T, src)
 
@@ -386,5 +417,5 @@ class PointCloud:
                 break
 
             prev_error = mean_error
-        T, _, _ = self.best_fit_transform(A, src[:m, :].T, np.ones(n).reshape(1, n))
+        T, _, _ = best_fit_transform(A, src[:m, :].T, np.ones(n).reshape(1, n))
         return T, distances, i, mean_error

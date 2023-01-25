@@ -36,9 +36,9 @@ class RRT_sim:
 
         self.slam = SLAM(self.robot)
         self.slam_thr = thr.Thread(target=self.slam.run, args=())
-        #self.slam_thr.start()
+        self.slam_thr.start()
 
-        self.manual_map()
+        #self.manual_map()
 
     # make map
     def manual_map(self):
@@ -248,7 +248,6 @@ class RRT_sim:
                 if curr_point < len(self.rrt.path) + 1:
                     prec = 0.005
                     k = 1
-                    goal = self.plotter.scale_to_m(*self.rrt.path[-curr_point])
                 else:
                     prec = 0.005
                     k = 1
@@ -257,56 +256,9 @@ class RRT_sim:
                     self.robot.go_to(*goal, prec=prec, k=k)
                     curr_point += 1
 
-    def start_old(self):
-
-        while self.running:
-            curr_point = 1
-            while not self.new_map:
-                self.update_keys()
-                self.draw_map()
-                self.screen_obj.step()
-                if self.end_point.any():
-                    self.apply_robot_radius_to_map()
-                    break
-            while not self.new_map:
-                self.update_keys()
-                if not self.drive:
-                    self.robot.going_to_target_pos = False
-                    goal = None
-                self.draw_map()
-                if self.step:
-                    self.rrt.step()
-                self.draw_nodes()
-                self.draw_edges()
-                if self.rrt.dist_reached:
-                    self.rrt.get_path()
-                    self.draw_path()
-                    self.draw_curr_pos()
-                    if self.drive and curr_point < len(self.rrt.path) + 2:
-
-                        if curr_point < len(self.rrt.path) + 1:
-                            prec = 0.005
-                            k = 1
-                            goal = self.plotter.scale_to_m(*self.rrt.path[-curr_point])
-                        else:
-                            prec = 0.005
-                            k = 1
-
-                        if self.drive and not self.robot.going_to_target_pos:
-                            self.robot.go_to(*goal, prec=prec, k=k)
-                            curr_point += 1
-                    else:
-                        self.drive = False
-                self.screen_obj.step()
-                if not self.flow:
-                    self.step = False
-            self.grab_map()
-            self.new_map = False
-            self.end_point = np.array(False)
-        pg.quit()
 
 
-robot = KUKA('192.168.88.21', ros=False, offline=True, read_depth=False, camera_enable=False, advanced=True)
+robot = KUKA('192.168.88.21', ros=False, offline=False, read_depth=False, camera_enable=False, advanced=True)
              #read_from_log=("log/log3.txt", 10))
 #log=("log/log3.txt", 10)
 rrt_sim = RRT_sim(robot)
