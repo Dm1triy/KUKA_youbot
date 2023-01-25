@@ -19,7 +19,7 @@ class Space3D:
         self.width, self.height = int(width * self.ps_width), int(height * self.ps_height)
         self.h_width, self.h_height = self.width // 2, self.height // 2
         self.color_mat = np.zeros((self.width, self.height, 3), dtype=np.uint32)
-        self.depth_mat = np.zeros((self.width, self.height), dtype=np.float32)
+        self.depth_mat = np.zeros((self.width, self.height), dtype=float_bit)
         self.func = lambda *args: args
         self.last_hover_pos = (0, 0)
         self.last_mouse_wheel = 0
@@ -59,6 +59,7 @@ class Space3D:
             i.draw()
         #return self.operating_surf
         #maybe blit_array
+        arr = ""
         return pg.surfarray.make_surface(self.color_mat)
 
     def add_object(self, vertices, faces):

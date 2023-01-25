@@ -18,7 +18,7 @@ class Object3D:
             [0, 1, 0, 0],
             [0, 0, 1, 0],
             [x, y, z, 1]
-        ])
+        ]).astype(float_bit)
 
     def translate(self, pos):
         self.transform = self.transform @ translate(pos)
@@ -43,14 +43,14 @@ class Solid3D(Object3D):
     def __init__(self, render, vertices='', faces='', pos=None):
         super().__init__(render, pos)
         if vertices:
-            self.vertices = np.array([np.array(v) for v in vertices]).astype(np.float32)
+            self.vertices = np.array([np.array(v) for v in vertices]).astype(float_bit)
         if faces:
             faces_ = []
             for face in faces:
                 for f_ in range(2, len(face)):
                     faces_.append([face[f_ - 1], face[f_], face[0]])
             self.faces = np.array(faces_).astype(np.uint32)
-        self.center_of_mass = np.mean(self.vertices, axis=0).astype(np.float32)
+        self.center_of_mass = np.mean(self.vertices, axis=0).astype(float_bit)
         self.font = pg.font.SysFont('Arial', 30, bold=True)
         self.color_faces = np.array([[255,255,255] for _ in self.faces]).astype(np.uint32)
         self.movement_flag, self.draw_vertices = True, False
@@ -65,8 +65,8 @@ class Solid3D(Object3D):
             B = self.vertices[face[0]][:3] - self.vertices[face[1]][:3]
             face_normals.append(np.cross(B, A))
             face_centers.append(center_of_face)
-        self.face_normals = np.array(face_normals).astype(np.float32)
-        self.face_centers = np.array(face_centers).astype(np.float32)
+        self.face_normals = np.array(face_normals).astype(float_bit)
+        self.face_centers = np.array(face_centers).astype(float_bit)
 
         self.vert_to_global()
         self.not_drawn_vertices = []
@@ -75,29 +75,22 @@ class Solid3D(Object3D):
         self.global_vert = np.copy(self.vertices)
 
     def draw(self):
-        #print("timer")
-        #t = time.time()
+        print("timer", end=" ")
+        t = time.time()
         self.vert_to_global()
         vertices = self.global_vert @ self.render.camera.camera_matrix()
         vertices = vertices @ self.render.projection.projection_matrix
-
-
-        # vertices / z (delete not drawn vertices)
-        #vertices = vertices @ self.render.projection.to_screen_matrix  # map range (-1 - 1 to width_height)
-
-        #print("1:", time.time() - t, end=" ")
-        #t = time.time()
-
+        print("t1:", t-time.time(), end=' ')
+        t = time.time()
         render_polygons(self.render.color_mat,
                         self.render.depth_mat,
                         vertices,
                         self.faces,
                         self.face_normals,
-                        self.face_centers,
                         self.color_faces
                         )
-        #print("2:", time.time() - t)
-        #t = time.time()
+        print("end:", t - time.time())
+        t = time.time()
 
     def draw_old(self):
         print("timer")
@@ -123,7 +116,7 @@ class Solid3D(Object3D):
                     self.color_faces,
                     self.faces,
                     self.face_normals,
-                    self.face_centers,
+                    self.global_face_centers,
                     not_drawn_vertices,
                     self.render.camera.position(),
                     polygons,

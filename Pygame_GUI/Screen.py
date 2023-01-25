@@ -20,6 +20,7 @@ class Screen:
         self.clock = pg.time.Clock()
         self.max_fps = fps
         self.fps = 0
+        self.mouse_clicked = False
 
     def step(self):
         if self.running:
@@ -29,7 +30,7 @@ class Screen:
             self.handle_events()
             self.clock.tick(self.max_fps)
             self.fps = self.clock.get_fps()
-            print(self.clock.get_fps())
+            #print(self.clock.get_fps())
 
     def run(self):
         while self.running:
@@ -65,6 +66,8 @@ class Screen:
                     self.pressed_keys.pop(self.pressed_keys.index(event.key))
             elif event.type == pg.MOUSEWHEEL:
                 self.mouse_wheel_pos += event.y
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                self.mouse_clicked = True
             if self.curr_obj:
                 if self.active_obj["event"] not in ("pressed", "dragged"):
                     self.active_obj["obj"] = self.curr_obj
@@ -79,6 +82,8 @@ class Screen:
                 if event.type == pg.MOUSEBUTTONUP:
                     self.active_obj["event"] = "released"
                 elif event.type == pg.MOUSEBUTTONDOWN:
+                    self.mouse_clicked = True
+                    print(123)
                     self.active_obj["obj"] = self.curr_obj
                     self.active_obj["event"] = "pressed"
                     self.active_obj["args"] = *self.local_mouse_state(obj), event.button

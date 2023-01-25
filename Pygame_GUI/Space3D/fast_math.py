@@ -1,10 +1,7 @@
 from numba import njit
 import numba
 import numpy as np
-
-# screen parameters
-WIDTH = 1000
-HEIGHT = 1000
+from Pygame_GUI.Space3D.constants import *
 
 
 @njit(fastmath=True)
@@ -16,49 +13,54 @@ def triangle_area(ax, ay, bx, by, cx, cy):
 
 
 @njit(fastmath=True)
-def render_polygons(color_mat, depth_mat, vertices, faces, normals, face_centers, face_colors):
-    width, height = depth_mat.shape
+def render_polygons(color_mat, depth_mat, vertices, faces, normals, face_colors):
     for face in range(len(faces)):
+
         all_vert = vertices[faces[face]]
-        A = all_vert[0][:3] - all_vert[-1][:3]
-        B = all_vert[0][:3] - all_vert[1][:3]
-        normal = np.cross(A, B).astype(np.float32)
-        g_normal = normals[face]
-        plane_a, plane_b, plane_c = normal
-        plane_d = np.dot(face_centers[face][:3], normal)
-        print(plane_a, plane_b, plane_c, plane_d)
-        x0, y0, z0, w0 = vertices[faces[face][0]]
-        x1, y1, z1, w1 = vertices[faces[face][1]]
-        x2, y2, z2, w2 = vertices[faces[face][2]]
+        x0, y0, z0, w0 = all_vert[0]
+        x1, y1, z1, w1 = all_vert[1]
+        x2, y2, z2, w2 = all_vert[2]
         if w0 < 0 or w1 < 0 or w2 < 0:
             continue
-        xp0 = int((x0 / z0 + 1) / 2 * width)
-        xp1 = int((x1 / z1 + 1) / 2 * width)
-        xp2 = int((x2 / z2 + 1) / 2 * width)
-        yp0 = int((1 - y0 / z0) / 2 * height)
-        yp1 = int((1 - y1 / z1) / 2 * height)
-        yp2 = int((1 - y2 / z2) / 2 * height)
+        x0, y0, z0 = x0 / w0, y0 / w0,  w0
+        x1, y1, z1 = x1 / w1, y1 / w1,  w1
+        x2, y2, z2 = x2 / w2, y2 / w2,  w2
+        g_normal = normals[face]
+        plane_a = (y0-y1)*(z0-z2)-(z0-z1)*(y0-y2)
+        plane_b = -(x0-x1)*(z0-z2)+(z0-z1)*(x0-x2)
+        plane_c = (x0-x1)*(y0-y2)-(y0-y1)*(x0-x2)
+        plane_d = plane_a * x0 + plane_b * y0 + plane_c * w0
+        xp0 = int((x0 + 1) / 2 * WIDTH)
+        xp1 = int((x1 + 1) / 2 * WIDTH)
+        xp2 = int((x2 + 1) / 2 * WIDTH)
+        yp0 = int((1 - y0) / 2 * HEIGHT)
+        yp1 = int((1 - y1) / 2 * HEIGHT)
+        yp2 = int((1 - y2) / 2 * HEIGHT)
         bbx_min = int(max(0, min(min(xp0, xp1), xp2)))
-        bbx_max = int(min(width-1, max(max(xp0, xp1), xp2)))
+        bbx_max = int(min(WIDTH - 1, max(max(xp0, xp1), xp2)))
         bby_min = int(max(0, min(min(yp0, yp1), yp2)))
-        bby_max = int(min(height-1, max(max(yp0, yp1), yp2)))
+        bby_max = int(min(HEIGHT - 1, max(max(yp0, yp1), yp2)))
         for cx in range(bbx_min, bbx_max):
             for cy in range(bby_min, bby_max):
                 if plane_c == 0:
                     continue
-                dist = (cx * plane_a + cy * plane_b - plane_d) / (-plane_c)
-                if depth_mat[cx, cy] < dist or depth_mat[cx, cy] == 0.0:
+                xp = cx / WIDTH * 2 - 1
+                yp = 1 - cy / HEIGHT * 2
+                dist = -(plane_a * xp + plane_b * yp - plane_d) / plane_c
+                if depth_mat[cx, cy] > dist or depth_mat[cx, cy] == 0.0:
                     full_triangle_area = abs(triangle_area(xp0, yp0, xp1, yp1, xp2, yp2))
                     area_sum = 0
                     area_sum += abs(triangle_area(xp0, yp0, xp1, yp1, cx, cy))
                     area_sum += abs(triangle_area(xp0, yp0, xp2, yp2, cx, cy))
                     area_sum += abs(triangle_area(xp1, yp1, xp2, yp2, cx, cy))
                     if area_sum + 0.01 > full_triangle_area > area_sum - 0.01:
+
+                        depth_mat[cx, cy] = dist
                         lighting = (np.dot(g_normal, LIGHT_DIRECTION) /
                                     (np.linalg.norm(LIGHT_DIRECTION, ord=1) * np.linalg.norm(g_normal, ord=1)) + 1) / 2
                         r, g, b = face_colors[face]
                         h, s, l = rgb_to_hsl(r, g, b)
-                        color_mat[cx, cy, :] = hsl_to_rgb(h, s, lighting**2)
+                        color_mat[cx, cy, :] = hsl_to_rgb(h, s, lighting ** 2)
 
 
 @njit(fastmath=True)
@@ -79,14 +81,13 @@ def rgb_to_hsl(r, g, b):
             b: (r - g) / d + 4,
         }[high]
         h /= 6
-    l /=255
+    l /= 255
 
     return h, s, l
 
 
 @njit(fastmath=True)
 def hsl_to_rgb(h, s, l):
-
     def hue_to_rgb(p, q, t):
         t += 1 if t < 0 else 0
         t -= 1 if t > 1 else 0
@@ -162,6 +163,3 @@ def render_func(vertices,
                             (np.linalg.norm(LIGHT_DIRECTION, ord=1) * np.linalg.norm(normal, ord=1)) + 1) / 2
                 polygon_arr[i, :] = vertices[face]
                 colors[i, :] = [*color[:2], int(100 * lighting ** 2), 100]
-
-
-LIGHT_DIRECTION = np.array([1, 1, 0]).astype(np.float32)

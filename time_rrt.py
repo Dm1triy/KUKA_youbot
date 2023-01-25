@@ -1,13 +1,7 @@
-import numpy as np
-import threading as thr
-import cv2
-import pygame as pg
-import scipy
-
-from pathfinding.RRT import RRT
 from Pygame_GUI.Screen import Screen
 from Pygame_GUI.Space3D.Space3D import Space3D
 from Pygame_GUI.Objects import *
+from Pygame_GUI.constants import *
 
 
 class TimeRrtGui:
@@ -17,7 +11,7 @@ class TimeRrtGui:
         self.space_3d = Space3D(self.screen, x=0, y=0, width=1, height=1)
         self.old_pressed_keys = []
         self.old_mouse_pos = [0, 0]
-        #self.space_3d.load_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
+        self.space_3d.load_object_from_file("Pygame_GUI/Space3D/t_34_obj.obj")
         self.space_3d.add_object([(-1, -1, -1, 1), (1, -1, -1, 1), (-1, 1, -1, 1), (-1, -1, 1, 1),
                                   (1, 1, -1, 1), (1, -1, 1, 1),
                                   (-1, 1, 1, 1), (1, 1, 1, 1)],
@@ -35,5 +29,5 @@ class TimeRrtGui:
         self.space_3d.camera.reset()
 
 
-trgui = TimeRrtGui(2000, 2000)
+trgui = TimeRrtGui(WIDTH, HEIGHT)
 trgui.run()
