@@ -732,7 +732,7 @@ class KUKA:
                 self.threads_number += 1
                 self.go_to_tr.start()
 
-    def move_base_to_pos(self, prec=0.005, k=None, initial_speed=0):
+    def move_base_to_pos(self, prec=0.005, k=None, initial_speed=0.05):
         """
         Moving to point thread
         """
@@ -750,7 +750,7 @@ class KUKA:
             speed = min(initial_speed, dist * k)
             targ_ang = math.atan2(loc_y, loc_x)
             loc_ang = targ_ang - rob_ang
-            if dist < prec and (ang - rob_ang) < prec / 100:
+            if dist < prec and (ang - rob_ang) < prec / 10:
                 break
             fov_speed = speed * math.cos(loc_ang)
             side_speed = -speed * math.sin(loc_ang)

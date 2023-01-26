@@ -67,6 +67,7 @@ class PointCloud:
                 self.peak_coords[1] = np.append(self.peak_coords[1], [self.xy_form[self.peaks[i][0][1]]], axis=0)
 
     def icp(self, other, /, full=False):  # icp
+        print(123)
         if full:
             return self._icp(self.xy_form, other.xy_form)
         if self.peak_coords[1].any() and other.peak_coords[1].any():

@@ -28,9 +28,9 @@ class RRT:
                  start_point=None,
                  end_point=np.array(False),
                  bin_map=None,
-                 growth_factor=100,
+                 growth_factor=20,
                  e=0.04,
-                 end_dist=100,
+                 end_dist=25,
                  rrt_star_rad=20):
         self.end_point = end_point
         self.bool_map = bin_map
@@ -93,6 +93,8 @@ class RRT:
         if self.end_point.any():
             node = self.nodes[self.node_num - 1]
             dist = np.linalg.norm(node - self.end_point)
+            if self.dist_reached:
+                self.add_random()
             if self.force_random:
                 self.add_random()
                 self.force_random -= 1

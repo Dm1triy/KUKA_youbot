@@ -3,10 +3,12 @@ import threading as thr
 import time
 import math
 import scipy
+from matplotlib import pyplot
 
 from pathfinding.pose_graph import PoseGrah
 from pathfinding.pont_cloud import PointCloud
 from homogeneous_matrix import *
+
 
 class SLAM:
     def __init__(self, robot):
@@ -23,53 +25,88 @@ class SLAM:
         self.main_thr = thr.main_thread()
         self.optimizing = False
 
-        self.map_size = 2000
+        self.map_size = 500
         self.odom, self.lidar = self.robot.lidar
         self.odom_err = None
         self.last_reg_odom = None
         self.corr_pos = [0, 0, 0]
         self.point_cloud = None
-        self.bool_map = np.ones((self.map_size, self.map_size))
+        self.bool_map = np.zeros((self.map_size, self.map_size))
         self.discrete = 100
         self.node_queue = []
 
         self.queue_lock = thr.Lock()
+        self.no_slam = False
 
     def run(self):
-        time.sleep(1)
-        self.odom, self.lidar = self.robot.increment_by_wheels, self.robot.lidar[-1]
-        self.pose_graph.add_node(-1, self.odom, PointCloud([self.odom, self.lidar]), self.path_length)
-        optimizer = thr.Thread(target=self.optimize, args=())
-        optimizer.start()
-        while self.main_thr.is_alive():
+        if self.no_slam:
+            time.sleep(1)
+            self.odom, self.lidar = self.robot.increment, self.robot.lidar[1]
+            self.pose_graph.add_node(-1, self.odom, PointCloud([self.odom, self.lidar]), self.path_length)
+            while self.main_thr.is_alive():
+                self.odom, self.lidar = self.robot.increment, self.robot.lidar[-1]
+                if self.odom and self.lidar:
+                    self.process_SLAM()
+                    for i in self.node_queue:
+                        half = self.map_size // 2
+                        new = i[1].xy_form
+                        for j in new:
+                            try:
+                                j = j * self.discrete
+                                self.bool_map[int(j[0]) + half][int(j[1]) + half] = 1
+                            except IndexError:
+                                print("out of bounds")
+                time.sleep(0.2)
+        else:
+            time.sleep(1)
             self.odom, self.lidar = self.robot.increment_by_wheels, self.robot.lidar[-1]
-            if self.odom and self.lidar:
-                self.process_SLAM()
-            time.sleep(0.05)
-
+            self.pose_graph.add_node(-1, self.odom, PointCloud([self.odom, self.lidar]), self.path_length)
+            optimizer = thr.Thread(target=self.optimize, args=())
+            optimizer.start()
+            while self.main_thr.is_alive():
+                self.odom, self.lidar = self.robot.increment_by_wheels, self.robot.lidar[-1]
+                if self.odom and self.lidar:
+                    self.process_SLAM()
+                time.sleep(0.05)
 
     def map(self):
         return self.bool_map
 
+    def plot_map_from_graph(self):
+        bool_map = np.zeros((self.map_size, self.map_size))
+        for i in range(0, len(self.pose_graph)):
+            half = self.map_size // 2
+            new = self.pose_graph[i, "object"].xy_form
+            for j in new:
+                try:
+                    j = j * self.discrete
+                    bool_map[int(j[0]) + half][int(j[1]) + half] = 1
+                except IndexError:
+                    print("out of bounds")
+
+        self.bool_map = bool_map
+
+    def process_node_queue(self):
+        for i in self.node_queue:
+            self.pose_graph.add_node(-1, *i)
+        self.last_reg_odom = self.pose_graph[-1, "mat_pos"]
     def optimize(self):
-        j=0
+        j = 0
         while self.main_thr.is_alive():
-            #print(j)
-            for i in self.node_queue:
-                self.pose_graph.add_node(-1, *i)
-            self.last_reg_odom = self.pose_graph[-1, "mat_pos"]
+            # print(j)
+            self.process_node_queue()
             if len(self.pose_graph) > 0:
                 self.node_queue = []
                 self.optimizing = True
                 self.SLAM_add_edges()
                 self.Gauss_Newton()
+                self.plot_map_from_graph()
                 corr_odom = np.linalg.inv(self.last_reg_odom) @ homogen_matrix_from_pos(self.robot.increment_by_wheels)
-                self.robot.calculated_pos = [*pos_vector_from_homogen_matrix(self.pose_graph[-1, "mat_pos"] @ corr_odom)]
+                self.robot.calculated_pos = [
+                    *pos_vector_from_homogen_matrix(self.pose_graph[-1, "mat_pos"] @ corr_odom)]
                 self.optimizing = False
                 self.all_detected_corners = self.stored_detected_corners[:]
-            j+=1
-
-
+            j += 1
 
     def add_curr_to_queue(self):
         self.queue_lock.acquire()
@@ -79,9 +116,9 @@ class SLAM:
     def process_SLAM(self):
         self.point_cloud = PointCloud([self.odom, self.lidar])
         self.path_length = self.robot.trace
-        #print(self.path_length, self.last_path, self.path_length - self.last_path)
-        if self.point_cloud.peak_coords[0]:
-            for i in range(len(self.pose_graph) - 1, len(self.pose_graph)-5, -1):
+        # print(self.path_length, self.last_path, self.path_length - self.last_path)
+        if self.point_cloud.peak_coords[0] and not self.no_slam:
+            for i in range(len(self.pose_graph) - 1, len(self.pose_graph) - 5, -1):
                 icp_out = self.pose_graph[-1, "object"].icp(self.point_cloud)
                 err = pos_vector_from_homogen_matrix(icp_out[0])
                 if icp_out and icp_out[-1] < 0.03 and err[0] ** 2 + err[1] ** 2 < 1 and abs(err[2]) < 0.7:
@@ -93,28 +130,28 @@ class SLAM:
         if self.path_length - self.last_path > 10:
             self.last_path = self.path_length
             self.add_curr_to_queue()
-            print("too long")
+            #print("too long")
 
     def SLAM_add_edges(self):
         self.all_detected_corners = [None, np.array(False)]
         self.pose_graph.update(0)
         for i in range(len(self.pose_graph)):
             self.pose_graph.update(i)
-        #print("Glogal ICP: ")
-        for i in range(len(self.pose_graph)-1, -1, -1):
-            #print(i)
+        # print("Glogal ICP: ")
+        for i in range(len(self.pose_graph) - 1, -1, -1):
+            # print(i)
             for j in range(0, i):
-                #if self.pose_graph[i, "object"].peak_coords[0] and len(self.pose_graph[i, "object"].peak_coords[0]) > 3:
+                # if self.pose_graph[i, "object"].peak_coords[0] and len(self.pose_graph[i, "object"].peak_coords[0]) > 3:
                 icp_out = self.pose_graph[i, "object"].icp(self.pose_graph[j, "object"], full=True)
                 corrected_odom = undo_lidar(
                     np.dot(icp_out[0], self.pose_graph[i, "lidar_mat_pos"]))
                 if icp_out and icp_out[-1] < 0.08:
                     print(i, j, "edge")
                     self.pose_graph.add_edge(j, corrected_odom, i, np.array([[5, 0, 0], [0, 5, 0], [0, 0, 5]]))
-                    #if abs(i-j)>10:
+                    # if abs(i-j)>10:
                     #    self.plot_icp(corrected_odom, j, i)
                     break
-        #print("local ICP")
+        # print("local ICP")
         for i in range(len(self.pose_graph)):
             if self.pose_graph[i, "object"].peak_coords[0]:
                 nn = self.check_existing_corners(self.pose_graph[i, "object"])
@@ -227,8 +264,8 @@ class SLAM:
                     H[i * 3:(i + 1) * 3, j * 3:(j + 1) * 3] += A.T @ OM @ B
 
             b = b.reshape(b.shape[0], 1)
-            #cv2.imshow("H", H)
-            #cv2.waitKey(3)
+            # cv2.imshow("H", H)
+            # cv2.waitKey(3)
             # print(ov_sq_err)
             H = np.copy(H[3:, 3:])
             b = np.copy(b[3:, 0])
@@ -238,22 +275,4 @@ class SLAM:
                 (self.pose_graph.pos.reshape(1, len(self.pose_graph) * 3) + dx.T * 0.4).reshape(len(self.pose_graph),
                                                                                                 3))
 
-        bool_map = np.ones((self.map_size, self.map_size))
-        for i in range(0, len(self.pose_graph)):
-            half = self.map_size // 2
-            new = self.pose_graph[i, "object"].xy_form
-            for j in new:
-                try:
-                    j = j * self.discrete
-                    bool_map[int(j[0]) + half][int(j[1]) + half] = 0
-                except IndexError:
-                    print("out of bounds")
 
-        # map = self.pose_graph.get_converted_object(1)
-        # for i in range(2, len(self.pose_graph)):
-        #    new = self.pose_graph.get_converted_object(i)
-        #    map = np.append(map, new, axis=0)
-        # pyplot.plot([p[0] for p in map], [p[1] for p in map], '.', label="test")
-        # print(map.shape)
-
-        self.bool_map = bool_map
