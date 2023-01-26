@@ -13,14 +13,56 @@ def triangle_area(ax, ay, bx, by, cx, cy):
 
 
 @njit(fastmath=True)
+def render_edges(color_mat, depth_mat, vertices, edges, edge_colors):
+    for edge in range(len(edges)):
+        all_vert = vertices[edges[edge]]
+        x0, y0, z0, w0 = all_vert[0]
+        x1, y1, z1, w1 = all_vert[1]
+        if w0 <= 0 or w1 <= 0:
+            continue
+        x0, y0, z0 = x0 / w0, y0 / w0,  w0
+        x1, y1, z1 = x1 / w1, y1 / w1,  w1
+
+        xl, yl, zl = x1 - x0, y1 - y0, z1 - z0
+        xp0 = int((x0 + 1) / 2 * WIDTH)
+        xp1 = int((x1 + 1) / 2 * WIDTH)
+        yp0 = int((1 - y0) / 2 * HEIGHT)
+        yp1 = int((1 - y1) / 2 * HEIGHT)
+        bbx_min = int(max(0, min(xp0, xp1)))
+        bbx_max = int(min(WIDTH - 1, max(xp0, xp1)))
+        bby_min = int(max(0, min(yp0, yp1)))
+        bby_max = int(min(HEIGHT - 1, max(yp0, yp1)))
+        if bby_max - bby_min > bbx_max - bbx_min:
+            for cy in range(bby_min, bby_max):
+                yp = 1 - cy / HEIGHT * 2
+                xp = xl * (yp-y0) / yl + x0
+                if not 1 > xp > -1:
+                    continue
+                cx = int((xp + 1) / 2 * WIDTH)
+                zp = zl * (yp-y0) / yl + z0
+                if depth_mat[cx, cy] > zp or depth_mat[cx, cy] == 0.0:
+                    color_mat[cx, cy, :] = edge_colors[edge]
+        else:
+            for cx in range(bbx_min, bbx_max):
+                xp = cx / WIDTH * 2 - 1
+                yp = yl * (xp-x0) / xl + y0
+                if not 1 > yp > -1:
+                    continue
+                cy = int((1 - yp) / 2 * HEIGHT)
+                zp = zl * (xp-x0) / xl + z0
+                if depth_mat[cx, cy] > zp or depth_mat[cx, cy] == 0.0:
+                    color_mat[cx, cy] = edge_colors[edge]
+
+
+
+@njit(fastmath=True)
 def render_polygons(color_mat, depth_mat, vertices, faces, normals, face_colors):
     for face in range(len(faces)):
-
         all_vert = vertices[faces[face]]
         x0, y0, z0, w0 = all_vert[0]
         x1, y1, z1, w1 = all_vert[1]
         x2, y2, z2, w2 = all_vert[2]
-        if w0 < 0 or w1 < 0 or w2 < 0:
+        if w0 <= 0 or w1 <= 0 or w2 <= 0:
             continue
         x0, y0, z0 = x0 / w0, y0 / w0,  w0
         x1, y1, z1 = x1 / w1, y1 / w1,  w1

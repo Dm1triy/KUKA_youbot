@@ -36,10 +36,10 @@ class Space3D:
         self.projection = Projection(self)
         self.operating_surf = pg.Surface((self.width, self.height))
 
-        self.all_obj = []#Axes(self)]
+        self.all_obj = []
         self.rect = par_surf.add_object(self)
 
-    def load_object_from_file(self, filename):
+    def load_object_from_file(self, filename, pos=None):
         vertex, faces = [], []
         with open(filename) as f:
             for line in f:
@@ -48,7 +48,7 @@ class Space3D:
                 elif line.startswith('f'):
                     faces_ = line.split()[1:]
                     faces.append([int(face_.split('/')[0]) - 1 for face_ in faces_])
-        self.all_obj.append(Solid3D(self, vertex, faces))
+        self.all_obj.append(Solid3D(self, vertex, faces, pos))
 
     @property
     def surf(self):
@@ -62,8 +62,8 @@ class Space3D:
         arr = ""
         return pg.surfarray.make_surface(self.color_mat)
 
-    def add_object(self, vertices, faces):
-        self.all_obj.append(Solid3D(self, vertices, faces))
+    def add_object(self, obj):
+        self.all_obj.append(obj)
 
 
     def update(self):
