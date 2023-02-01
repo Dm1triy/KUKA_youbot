@@ -21,7 +21,7 @@ class Space3D:
         self.color_mat = np.zeros((self.width, self.height, 3), dtype=np.uint32)
         self.depth_mat = np.zeros((self.width, self.height), dtype=float_bit)
         self.func = lambda *args: args
-        self.last_hover_pos = (0, 0)
+        self.last_drag_pos = (0, 0)
         self.last_mouse_wheel = 0
         self.is_pressed = False
         self.mouse_sense = 0.1
@@ -70,36 +70,30 @@ class Space3D:
         if self.rect.collidepoint(pg.mouse.get_pos()):
             self.camera.control()
             self.update_keys()
-        self.func(self.last_hover_pos, self.is_pressed)
+
+
+        delta = self.last_mouse_wheel - self.par_surf.mouse_wheel_pos
+        self.last_mouse_wheel = self.par_surf.mouse_wheel_pos
+        if self.camera.mode == 1 and delta:
+            self.camera.control(transition=np.array([0, 0, -delta, 0]))
 
     def pressed(self, *args):
-        self.last_hover_pos = args
         self.is_pressed = True
 
     def dragged(self, *args):
         self.is_pressed = True
-        if args[2] == 1:
-            rotation = (self.last_hover_pos[0] - args[0]) * self.mouse_sense, (
-                    self.last_hover_pos[1] - args[1]) * self.mouse_sense, 0
+        if args[4] == 1:
+            rotation = args[2] * self.mouse_sense, (
+                    args[3]) * self.mouse_sense, 0
         else:
-            rotation = 0, 0, (self.last_hover_pos[0] - args[0]) * self.mouse_sense
+            rotation = 0, 0, args[2] * self.mouse_sense
 
         self.camera.control(rotation=rotation)
-        self.last_hover_pos = args[:2]
 
     def hover(self, *args):
-        self.last_hover_pos = args[:2]
         self.is_pressed = False
-        delta = self.last_mouse_wheel - self.par_surf.mouse_wheel_pos
-        self.last_mouse_wheel = self.par_surf.mouse_wheel_pos
-        if self.camera.mode == 1:
-            self.camera.control(transition=np.array([0, 0, -delta, 0]))
 
-    def released(self, *args):
-        pass
 
-    def clicked(self, *args):
-        pass
 
     def slip(self, *args):
         self.camera.control(transition=np.array([0, 0, 0, 0]), rotation=[0, 0, 0])

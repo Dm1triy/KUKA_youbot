@@ -49,12 +49,6 @@ class Sprite:
     def update(self):
         pass
 
-    def released(self, *args):
-        pass
-
-    def clicked(self, *args):
-        pass
-
 
 class Button(Sprite):
     def __init__(self, par_surf, /, **kwargs):
@@ -67,21 +61,21 @@ class Button(Sprite):
 class Text(Sprite):
     def __init__(self, par_surf, /,
                  inp_text=lambda *args: "your text",
+                 color=(255, 255, 255),
                  font='serif',
                  font_size=10, **kwargs):
-        super().__init__(par_surf, **kwargs)
+        super().__init__(par_surf, color=color, **kwargs)
         self.inp_text = inp_text
         self.text = inp_text
         self.text = pg.font.SysFont(font, int(font_size * self.ps_height / 500))
-        self.surf = self.text.render(self.inp_text(), False, self.color)
+        self.surf = self.text.render(str(self.inp_text()), False, self.color)
         self.rect = par_surf.add_object(self)
-
 
     def pressed(self, *args):
         self.func(args)
 
     def update(self):
-        self.surf = self.text.render(self.inp_text(), False, self.color)
+        self.surf = self.text.render(str(self.inp_text()), False, self.color)
 
 
 class Slider(Sprite):

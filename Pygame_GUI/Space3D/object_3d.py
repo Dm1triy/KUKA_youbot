@@ -40,16 +40,33 @@ class Object3D:
 
 
 class Hollow3D(Object3D):
-    def __init__(self, render, vertices='', edges='', pos=None):
+    def __init__(self, render, vertices='', edges='', pos=None, /,
+                 edges_thickness=None,
+                 vertex_colors='',
+                 vertex_radius=''):
         super().__init__(render, pos)
         if vertices:
             self.vertices = np.array([np.array(v) for v in vertices]).astype(float_bit)
         if edges:
             self.edges = np.array(edges).astype(np.uint32)
+        if edges_thickness:
+            self.edges_thickness = np.array(edges_thickness).astype(np.int16)
+        else:
+            self.edges_thickness = np.array([1] * len(self.edges)).astype(np.int16)
+        if vertex_colors:
+            self.vertex_colors = np.array(vertex_colors).astype(np.int16)
+        else:
+            self.vertex_colors = np.array([[255, 255, 255] for _ in self.vertices]).astype(np.uint32)
+        if vertex_radius:
+            self.vertex_radius = np.array(vertex_radius).astype(np.int16)
+        else:
+            self.vertex_radius = np.array([10] * len(self.vertices)).astype(np.int16)
         self.center_of_mass = np.mean(self.vertices, axis=0).astype(float_bit)
         self.font = pg.font.SysFont('Arial', 30, bold=True)
         self.color_edges = np.array([[255, 255, 255] for _ in self.edges]).astype(np.uint32)
         self.label = ''
+
+        self.color_edges = np.array([[255, 255, 255] for _ in self.edges]).astype(np.uint32)
 
         self.vert_to_global()
 
@@ -61,8 +78,14 @@ class Hollow3D(Object3D):
                      self.render.depth_mat,
                      vertices,
                      self.edges,
-                     self.color_edges
+                     self.color_edges,
+                     self.edges_thickness
                      )
+        render_vertices(self.render.color_mat,
+                        self.render.depth_mat,
+                        vertices,
+                        self.vertex_colors,
+                        self.vertex_radius)
 
     def vert_to_global(self):
         self.global_vert = self.vertices @ self.transform
@@ -115,11 +138,7 @@ class Solid3D(Object3D):
 
 class Axes(Hollow3D):
     def __init__(self, render):
-        self.vertices = np.array([(0, 0, 0, 1), (1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)])
-        self.edges = np.array([(0, 1), (0, 2), (0, 3)])
-        super().__init__(render)
+        super().__init__(render, [(0, 0, 0, 1), (1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)], [(0, 1), (0, 2), (0, 3)])
         self.color_edges = np.array([[255, 0, 0], [0, 255, 0], [0, 0, 255]]).astype(np.uint32)
-        print(self.color_edges)
         self.draw_vertices = False
         self.label = 'XYZ'
-

@@ -13,6 +13,7 @@ class TimeRrtGui:
         self.space_3d = Space3D(self.screen, x=0, y=0, width=1, height=1)
         self.old_pressed_keys = []
         self.old_mouse_pos = [0, 0]
+        #self.fps_text = Text(self.screen, x=0.1, y=0.01, inp_text=self.screen.get_fps, font='serif', font_size=10)
         self.space_3d.load_object_from_file("Pygame_GUI/Space3D/teapot.obj", (5, 0, 0))
         self.cube = (self.space_3d, [*np.array([(-1, -1, -1, 1), (1, -1, -1, 1), (-1, 1, -1, 1), (-1, -1, 1, 1),
                                                 (1, 1, -1, 1), (1, -1, 1, 1),
@@ -35,7 +36,6 @@ class TimeRrtGui:
                         self.bin_map[i, j, k] = 1
                         print([i, j, k])
             print(i)
-
     def run(self):
         while self.screen.running:
             self.screen.step()

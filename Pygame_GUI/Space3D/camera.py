@@ -20,6 +20,9 @@ class Camera:
         self.rotation_speed = 0.011
         self.mode = 1
         self.direction = np.eye(4)
+        self.roll = 0
+        self.pitch = 0
+        self.yaw = 0
 
         # service variables
         self.pos_serv = np.array([*position, 1.0])
@@ -39,9 +42,6 @@ class Camera:
         self.direction = np.eye(4)
 
     def control(self, /, transition=None, rotation=None):
-        inv = 1
-        if self.mode == 1:
-            inv = -1
         if isinstance(transition, np.ndarray):
             self.transition = transition * self.moving_speed
 
@@ -54,13 +54,23 @@ class Camera:
             self.pos_serv += self.transition @ self.direction * self.moving_speed
         elif self.mode == 1 and isinstance(transition, np.ndarray):
             self.pos_serv += self.transition * self.zoom_speed
+        if self.mode == 0:
+            if self.rotation[0]:
+                self.pitch += self.rotation[0] * self.rotation_speed
+            if self.rotation[1]:
+                self.roll += self.rotation[1] * self.rotation_speed
+            #if self.rotation[2]:
+            #    self.yaw += self.rotation[2] * self.rotation_speed
+            self.direction = rotate_x(self.roll) @ rotate_y(self.pitch) @ rotate_z(self.yaw)
+        elif self.mode == 1:
+            if self.rotation[0]:
+                self.direction = (rotate_y(self.rotation[0] * self.rotation_speed * -1)) @ self.direction
+            if self.rotation[1]:
+                self.direction = (rotate_x(self.rotation[1] * self.rotation_speed * -1)) @ self.direction
+            if self.rotation[2]:
+                self.direction = (rotate_z(self.rotation[2] * self.rotation_speed * -1)) @ self.direction
 
-        if self.rotation[0]:
-            self.direction = (rotate_y(self.rotation[0] * self.rotation_speed * inv)) @ self.direction
-        if self.rotation[1]:
-            self.direction = (rotate_x(self.rotation[1] * self.rotation_speed * inv)) @ self.direction
-        if self.rotation[2]:
-            self.direction = (rotate_z(self.rotation[2] * self.rotation_speed * inv)) @ self.direction
+
 
         # make matrix
         x, y, z, w = self.pos_serv

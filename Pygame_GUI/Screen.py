@@ -9,25 +9,26 @@ class Screen:
         self.width, self.height = width, height
         self.screen = pg.display.set_mode((width, height))
         self.pressed_obj_ind = None
-        self.fps = 24
+        self.fps = 0
         self.pressed_keys = []
-        self.mouse_wheel_pos = 0
-        self.mouse_pos = [0, 0]
-        self.old_mouse_pos = [0, 0]
-        self.active_obj = {"obj": None, "event": None, "args": None}
         self.curr_obj = None
-        self.last_mouse_btn = 0
         self.clock = pg.time.Clock()
         self.max_fps = fps
-        self.fps = 0
-        self.mouse_clicked = False
+
+        self.mouse_delta = [0,0]
+        self.process_btn_clk = 0
+        self.pressed_obj = None
+        self.old_mouse_pos = [0, 0]
+        self.mouse_wheel_pos = 0
+        self.mouse_pos = [0, 0]
+        self.mouse_state = [0, 0]
 
     def step(self):
         if self.running:
+            self.handle_events()
             self.update_object()
             pg.display.update()
             pg.display.flip()
-            self.handle_events()
             self.clock.tick(self.max_fps)
             self.fps = self.clock.get_fps()
             #print(self.clock.get_fps())
@@ -39,6 +40,9 @@ class Screen:
     def end(self):
         self.running = False
         pg.quit()
+
+    def get_fps(self):
+        return round(self.fps, 2)
 
     def handle_events(self):
         self.mouse_pos = pg.mouse.get_pos()
@@ -67,29 +71,11 @@ class Screen:
             elif event.type == pg.MOUSEWHEEL:
                 self.mouse_wheel_pos += event.y
             elif event.type == pg.MOUSEBUTTONDOWN:
-                self.mouse_clicked = True
-            if self.curr_obj:
-                if self.active_obj["event"] not in ("pressed", "dragged"):
-                    self.active_obj["obj"] = self.curr_obj
-                    self.active_obj["event"] = "hover"
-                    self.active_obj["args"] = self.local_mouse_state(self.curr_obj)
-
-                elif self.active_obj["event"] in ["dragged"]:
-                    if self.active_obj["obj"] == self.curr_obj and self.old_mouse_pos != self.mouse_pos:
-                        self.active_obj["event"] = "dragged"
-                        self.active_obj["args"] = *self.local_mouse_state(obj), self.last_mouse_btn
-
-                if event.type == pg.MOUSEBUTTONUP:
-                    self.active_obj["event"] = "released"
-                elif event.type == pg.MOUSEBUTTONDOWN:
-                    self.mouse_clicked = True
-                    print(123)
-                    self.active_obj["obj"] = self.curr_obj
-                    self.active_obj["event"] = "pressed"
-                    self.active_obj["args"] = *self.local_mouse_state(obj), event.button
-                    self.last_mouse_btn = event.button
-            else:
-                self.active_obj = {"obj": None, "event": None, "args": None}
+                self.mouse_state = [event.button, 1]
+                self.pressed_obj = self.curr_obj
+            elif event.type == pg.MOUSEBUTTONUP:
+                self.mouse_state = [event.button, 0]
+        self.mouse_delta = [self.old_mouse_pos[0] - self.mouse_pos[0], self.old_mouse_pos[1] - self.mouse_pos[1]]
         self.old_mouse_pos = self.mouse_pos[:]
 
     def add_object(self, obj):
@@ -97,14 +83,15 @@ class Screen:
         return self.screen.blit(obj.surf, (obj.x, obj.y))
 
     def update_object(self):
+        if self.pressed_obj:
+            self.pressed_obj.pressed(*self.mouse_pos, self.mouse_state[0])
+            self.pressed_obj = None
+        elif (self.mouse_delta[0] or self.mouse_delta[1]) and self.mouse_state[1]:
+            self.curr_obj.dragged(*self.mouse_pos, *self.mouse_delta, self.mouse_state[0])
+        if self.curr_obj:
+            self.curr_obj.hover(*self.mouse_pos)
+
         for obj in self.objects:
             obj.update()
             obj.rect = self.screen.blit(obj.surf, (obj.x, obj.y))
-        obj, event, args = self.active_obj.values()
-        if obj:
-            if event == "pressed":
-                self.active_obj["event"] = "dragged"
-            getattr(obj, event)(*args)
 
-    def local_mouse_state(self, obj):
-        return pg.mouse.get_pos()[0] - obj.x, pg.mouse.get_pos()[1] - obj.y
