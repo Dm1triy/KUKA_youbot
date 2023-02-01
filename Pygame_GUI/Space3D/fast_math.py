@@ -100,24 +100,24 @@ def render_polygons(color_mat, depth_mat, vertices, faces, normals, face_colors)
         x1, y1, z1 = x1 / w1, y1 / w1,  w1
         x2, y2, z2 = x2 / w2, y2 / w2,  w2
         g_normal = normals[face]
-        plane_a = (y0-y1)*(z0-z2)-(z0-z1)*(y0-y2)
-        plane_b = -(x0-x1)*(z0-z2)+(z0-z1)*(x0-x2)
-        plane_c = (x0-x1)*(y0-y2)-(y0-y1)*(x0-x2)
-        plane_d = plane_a * x0 + plane_b * y0 + plane_c * w0
         xp0 = int((x0 + 1) / 2 * WIDTH)
         xp1 = int((x1 + 1) / 2 * WIDTH)
         xp2 = int((x2 + 1) / 2 * WIDTH)
         yp0 = int((1 - y0) / 2 * HEIGHT)
         yp1 = int((1 - y1) / 2 * HEIGHT)
         yp2 = int((1 - y2) / 2 * HEIGHT)
+        plane_a = (y0-y1)*(z0-z2)-(z0-z1)*(y0-y2)
+        plane_b = -(x0-x1)*(z0-z2)+(z0-z1)*(x0-x2)
+        plane_c = (x0-x1)*(y0-y2)-(y0-y1)*(x0-x2)
+        plane_d = plane_a * x0 + plane_b * y0 + plane_c * w0
+        if plane_c == 0:
+            continue
         bbx_min = int(max(0, min(min(xp0, xp1), xp2)))
         bbx_max = int(min(WIDTH - 1, max(max(xp0, xp1), xp2)))
         bby_min = int(max(0, min(min(yp0, yp1), yp2)))
         bby_max = int(min(HEIGHT - 1, max(max(yp0, yp1), yp2)))
         for cx in range(bbx_min, bbx_max):
             for cy in range(bby_min, bby_max):
-                if plane_c == 0:
-                    continue
                 xp = cx / WIDTH * 2 - 1
                 yp = 1 - cy / HEIGHT * 2
                 dist = -(plane_a * xp + plane_b * yp - plane_d) / plane_c
