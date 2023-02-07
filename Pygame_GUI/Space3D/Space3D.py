@@ -50,6 +50,10 @@ class Space3D:
                     faces.append([int(face_.split('/')[0]) - 1 for face_ in faces_])
         self.all_obj.append(Solid3D(self, vertex, faces, pos))
 
+
+    def convert_to_local(self, coords):
+        return coords[0]-self.x, coords[1]-self.y
+
     @property
     def surf(self):
         self.color_mat = np.zeros((self.width, self.height, 3), dtype=np.int32)
@@ -77,25 +81,24 @@ class Space3D:
         if self.camera.mode == 1 and delta:
             self.camera.control(transition=np.array([0, 0, -delta, 0]))
 
-    def pressed(self, *args):
+    def pressed(self, *args, **kwargs):
         self.is_pressed = True
 
-    def dragged(self, *args):
+    def dragged(self, *args, **kwargs):
         self.is_pressed = True
-        if args[4] == 1:
-            rotation = args[2] * self.mouse_sense, (
-                    args[3]) * self.mouse_sense, 0
+        if kwargs["btn_id"] == 1:
+            rotation = kwargs["mouse_delta"][0] * self.mouse_sense, kwargs["mouse_delta"][1] * self.mouse_sense, 0
         else:
-            rotation = 0, 0, args[2] * self.mouse_sense
+            rotation = 0, 0, kwargs["mouse_delta"][0] * self.mouse_sense
 
         self.camera.control(rotation=rotation)
 
-    def hover(self, *args):
+    def hover(self, *args, **kwargs):
         self.is_pressed = False
 
 
 
-    def slip(self, *args):
+    def slip(self, *args, **kwargs):
         self.camera.control(transition=np.array([0, 0, 0, 0]), rotation=[0, 0, 0])
 
     def update_keys(self):

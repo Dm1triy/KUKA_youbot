@@ -1,4 +1,5 @@
 import pygame as pg
+import numpy as np
 
 
 def range_cut(mi, ma, val):
@@ -22,7 +23,7 @@ class Sprite:
                  y=0,
                  width=0,
                  height=0,
-                 func=lambda *args: args,
+                 func=lambda *args, **kwargs: args,
                  color=(100, 100, 100)):
         self.func = func
         self.par_surf = par_surf
@@ -37,25 +38,27 @@ class Sprite:
             self.surf.fill(self.color)
             self.rect = par_surf.add_object(self)
 
-    def pressed(self, *args):
+    def pressed(self, *args, **kwargs):
         pass
 
-    def dragged(self, *args):
+    def dragged(self, *args, **kwargs):
         pass
 
-    def hover(self, *args):
+    def hover(self, *args, **kwargs):
         pass
 
     def update(self):
         pass
+    def convert_to_local(self, coords):
+        return coords[0]-self.x, coords[1]-self.y
 
 
 class Button(Sprite):
     def __init__(self, par_surf, /, **kwargs):
         super().__init__(par_surf, **kwargs)
 
-    def pressed(self, *args):
-        self.func(args)
+    def pressed(self, *args, **kwargs):
+        self.func(*args, **kwargs)
 
 
 class Text(Sprite):
@@ -68,14 +71,15 @@ class Text(Sprite):
         self.inp_text = inp_text
         self.text = inp_text
         self.text = pg.font.SysFont(font, int(font_size * self.ps_height / 500))
-        self.surf = self.text.render(str(self.inp_text()), False, self.color)
+        self.surf = self.text.render(str(self.inp_text()), True, self.color)
         self.rect = par_surf.add_object(self)
 
-    def pressed(self, *args):
-        self.func(args)
+    def pressed(self, *args, **kwargs):
+        self.func(args, **kwargs)
 
     def update(self):
-        self.surf = self.text.render(str(self.inp_text()), False, self.color)
+        self.surf = self.text.render(str(self.inp_text()), True, self.color)
+
 
 
 class Slider(Sprite):
@@ -97,6 +101,7 @@ class Slider(Sprite):
             self.val = self.min
 
         self.slider_x = convert_range(self.slider_rad, self.width - self.slider_rad, self.min, self.max, self.val)
+        self.surf.fill((0,0,0))
 
         pg.draw.rect(self.surf, self.color, (0, 0, self.width, self.height), border_radius=self.height // 2)
         pg.draw.circle(self.surf, (255, 255, 255), (self.slider_x, self.slider_y), self.slider_rad)
@@ -104,8 +109,9 @@ class Slider(Sprite):
     def set_val(self, val):
         self.slider_x = convert_range(self.slider_rad, self.width - self.slider_rad, self.min, self.max, val)
 
-    def dragged(self, *args):
-        self.slider_x = range_cut(self.slider_rad, self.width - self.slider_rad, args[0])
+    def dragged(self, *args, **kwargs):
+        pos = kwargs["mouse_pos"]
+        self.slider_x = range_cut(self.slider_rad, self.width - self.slider_rad, pos[0])
         self.val = convert_range(self.min, self.max, self.slider_rad, self.width - self.slider_rad, self.slider_x)
         self.func(self.val)
 
@@ -114,31 +120,20 @@ class Slider(Sprite):
         pg.draw.circle(self.surf, (255, 255, 255), (self.slider_x, self.slider_y), self.slider_rad)
 
 
-class Mat:
+class Mat(Sprite):
     def __init__(self, par_surf, /,
-                 func=lambda *args: args,
-                 x=0,
-                 y=0,
-                 width=0,
-                 height=0,
-                 cv_mat_stream=None):
-        self.par_surf = par_surf
-        self.ps_width, self.ps_height = par_surf.width, par_surf.height
-        self.x = int(x * self.ps_width)
-        self.y = int(y * self.ps_height)
-        self.width = int(width * self.ps_width)
-        self.height = int(height * self.ps_height)
-        self.func = lambda *args: args
-        self.is_mat_stream = False
-        self.last_hover_pos = (0, 0)
-        self.is_pressed = False
+                 cv_mat_stream=None,
+                 **kwargs):
 
-        self.func = func
 
         if cv_mat_stream:
             self.cv_mat_stream = cv_mat_stream
         else:
             raise NoCvMatSet
+        super().__init__(par_surf, **kwargs)
+        self.is_mat_stream = False
+        self.last_hover_pos = (0, 0)
+        self.is_pressed = False
         self.rect = par_surf.add_object(self)
 
     @property
@@ -151,18 +146,23 @@ class Mat:
             surf = pg.transform.flip(pg.transform.rotate(pg.surfarray.make_surface(mat), -90), 1, 0)
         return surf
 
-    def update(self):
-        self.func(self.last_hover_pos, self.is_pressed)
-
-    def pressed(self, *args):
-        self.last_hover_pos = args
-        self.is_pressed = True
-
-    def dragged(self, *args):
-        self.is_pressed = True
-        self.last_hover_pos = args
+    @surf.setter
+    def surf(self, value):
         pass
 
-    def hover(self, *args):
-        self.last_hover_pos = args
+
+    def update(self):
+        self.func(mouse_pos=self.last_hover_pos, btn_id=self.is_pressed)
+
+    def pressed(self, *args, **kwargs):
+        self.last_hover_pos = kwargs["mouse_pos"]
+        self.is_pressed = kwargs["btn_id"]
+
+    def dragged(self, *args, **kwargs):
+        self.last_hover_pos = kwargs["mouse_pos"]
+        self.is_pressed = kwargs["btn_id"]
+        pass
+
+    def hover(self, *args, **kwargs):
+        self.last_hover_pos = kwargs["mouse_pos"]
         self.is_pressed = False

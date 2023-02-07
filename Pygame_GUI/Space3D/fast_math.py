@@ -36,7 +36,7 @@ def render_vertices(color_mat, depth_mat, vertices, vertex_colors, vertex_radius
                         depth_mat[cx, cy] = z0
 
 
-@njit(fastmath=True)
+njit(fastmath=True)
 def render_edges(color_mat, depth_mat, vertices, edges, edge_colors, thickness):
     for edge in range(len(edges)):
         all_vert = vertices[edges[edge]]
@@ -66,7 +66,7 @@ def render_edges(color_mat, depth_mat, vertices, edges, edge_colors, thickness):
                 cx = int((xp + 1) / 2 * WIDTH)
                 zp = zl * (yp-y0) / yl + z0
                 for t in range(-th//2, th//2):
-                    ind = range_cut(0, WIDTH, int(cx + t))
+                    ind = range_cut(0, WIDTH-1, int(cx + t))
                     if depth_mat[ind, cy] > zp or depth_mat[ind, cy] == 0.0:
                         color_mat[ind, cy, :] = edge_colors[edge]
                         depth_mat[ind, cy] = zp
@@ -80,7 +80,7 @@ def render_edges(color_mat, depth_mat, vertices, edges, edge_colors, thickness):
                 zp = zl * (xp-x0) / xl + z0
 
                 for t in range(-th // 2, th // 2):
-                    ind = range_cut(0, HEIGHT, int(cy + t))
+                    ind = range_cut(0, HEIGHT-1, int(cy + t))
                     if depth_mat[cx, ind] > zp or depth_mat[cx, ind] == 0.0:
                         color_mat[cx, ind, :] = edge_colors[edge]
                         depth_mat[cx, ind] = zp

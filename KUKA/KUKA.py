@@ -89,7 +89,7 @@ class KUKA:
 
         # control
         self.arm_ID = 0
-        self.arm_pos = [[0, 56, -80, -90, 0, 2], [0, 56, -80, -90, 0, 2]]  # last sent arm position
+        self.arm_pos = [[0, 56, -80, -90, 0, 1.98], [0, 56, -80, -90, 0, 1.98]]  # last sent arm position
         self.arm_vel = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]
         self.body_target_pos = [0, 0, 0]  # current body target position
         self.going_to_target_pos = False
@@ -160,9 +160,8 @@ class KUKA:
             self.corr_arm_pos = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
             self.arm_pos[0][:-1] = self.corr_arm_pos[0]
             self.arm_pos[1][:-1] = self.corr_arm_pos[1]
-            # раскомментить, для ожтдания данных с руки
-            # while not self.corr_arm_pos:
-            #    time.sleep(0.1)
+            while not self.corr_arm_pos and not advanced:
+                time.sleep(0.1)
         if log:
             self.logger_thr = thr.Thread(target=self.logger, args=log)
             self.logger_thr.start()
@@ -748,9 +747,10 @@ class KUKA:
             rob_ang = inc[2]
             dist = math.sqrt(loc_x ** 2 + loc_y ** 2)
             speed = min(initial_speed, dist * k)
+
             targ_ang = math.atan2(loc_y, loc_x)
             loc_ang = targ_ang - rob_ang
-            if dist < prec and (ang - rob_ang) < prec / 10:
+            if dist < prec and (ang - rob_ang) < prec:
                 break
             fov_speed = speed * math.cos(loc_ang)
             side_speed = -speed * math.sin(loc_ang)
@@ -946,6 +946,7 @@ class KUKA:
             while self.main_thr.is_alive():
                 buf_depth = self.client_depth.dequeue_buffer()
                 image_depth = np.array(Image.open(io.BytesIO(buf_depth.data)))
+                image_depth = np.stack([image_depth,image_depth,image_depth], axis=2)
                 # image_depth = cv2.cvtColor(np.array(image_depth), cv2.COLOR_BGR2GRAY)
                 self.client_depth.enqueue_buffer(buf_depth)
 

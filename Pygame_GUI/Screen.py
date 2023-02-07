@@ -1,4 +1,6 @@
 import pygame as pg
+import numpy as np
+from Pygame_GUI.fast_pygame import fast_blit
 
 
 class Screen:
@@ -8,6 +10,7 @@ class Screen:
         self.objects = []
         self.width, self.height = width, height
         self.screen = pg.display.set_mode((width, height))
+        self.color_mat = np.zeros((width, height, 3))
         self.pressed_obj_ind = None
         self.fps = 0
         self.pressed_keys = []
@@ -15,7 +18,7 @@ class Screen:
         self.clock = pg.time.Clock()
         self.max_fps = fps
 
-        self.mouse_delta = [0,0]
+        self.mouse_delta = [0, 0]
         self.process_btn_clk = 0
         self.pressed_obj = None
         self.old_mouse_pos = [0, 0]
@@ -31,7 +34,7 @@ class Screen:
             pg.display.flip()
             self.clock.tick(self.max_fps)
             self.fps = self.clock.get_fps()
-            #print(self.clock.get_fps())
+            # print(self.clock.get_fps())
 
     def run(self):
         while self.running:
@@ -84,14 +87,18 @@ class Screen:
 
     def update_object(self):
         if self.pressed_obj:
-            self.pressed_obj.pressed(*self.mouse_pos, self.mouse_state[0])
+            pomop = self.pressed_obj.convert_to_local(self.mouse_pos)
+            self.pressed_obj.pressed(mouse_pos=pomop, btn_id=self.mouse_state[0])
             self.pressed_obj = None
-        elif (self.mouse_delta[0] or self.mouse_delta[1]) and self.mouse_state[1]:
-            self.curr_obj.dragged(*self.mouse_pos, *self.mouse_delta, self.mouse_state[0])
-        if self.curr_obj:
-            self.curr_obj.hover(*self.mouse_pos)
+        elif self.curr_obj:
+            curr_obj_mouse_pos = self.curr_obj.convert_to_local(self.mouse_pos)
+            if (self.mouse_delta[0] or self.mouse_delta[1]) and self.mouse_state[1]:
+                self.curr_obj.dragged(mouse_pos=curr_obj_mouse_pos,
+                                      btn_id=self.mouse_state[0],
+                                      mouse_delta=self.mouse_delta)
+            else:
+                self.curr_obj.hover(mouse_pos=curr_obj_mouse_pos)
 
         for obj in self.objects:
             obj.update()
             obj.rect = self.screen.blit(obj.surf, (obj.x, obj.y))
-

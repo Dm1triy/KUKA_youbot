@@ -84,12 +84,12 @@ class GuiControl:
 
             while not self.robot.arm:
                 time.sleep(0.05)
-            m1_ang, m2_ang, m3_ang, m4_ang, m5_ang, grip = *self.robot.arm, 0
+            m1_ang, m2_ang, m3_ang, m4_ang, m5_ang, grip = *self.robot.arm, 0.2
         else:
-            m1_ang, m2_ang, m3_ang, m4_ang, m5_ang, grip = 0, 0, 0, 0, 0, 0
+            m1_ang, m2_ang, m3_ang, m4_ang, m5_ang, grip = 0, 0, 0, 0, 0, 0.2
         self.screen = Screen(self.width, self.height)
         Button(self.screen, x=0.6, y=0.897, width=0.08, height=0.06, color=(150, 255, 170), func=self.change_cam_mode)
-        Button(self.screen, x=0.726, y=0.897, width=0.08, height=0.06, color=(150, 255, 170), func=self.print_arm)
+        Button(self.screen, x=0.726, y=0.897, width=0.08, height=0.06, color=(150, 255, 170), func=self.reset_arm)
         self.m1_slider = Slider(self.screen,
                                 min=157, max=-134, val=m1_ang,
                                 x=0.556, y=0.641,
@@ -138,10 +138,10 @@ class GuiControl:
                                font='serif',
                                font_size=10)
 
-    def print_arm(self, *args):
-        print(self.robot.arm_pos)
+    def reset_arm(self, *args, **kwargs):
+        self.robot.move_arm(0, 56, -80, -90, 0, 2)
 
-    def change_cam_mode(self, *args):
+    def change_cam_mode(self, *args, **kwargs):
         """
         When called changes camera mode to different from current
         """
@@ -341,16 +341,17 @@ class GuiControl:
                                 30 + int(-240 / len(lidar) * (l + 1)), color,
                                 max(1, int(0.1 * self.move_body_scale)))
 
-    def update_body_pos(self, *args):
+    def update_body_pos(self, *args, **kwargs):
         """
         draws body rectangle on body_pos_screen and sends robot to set position if mouse pressed
         :param args: set: relative mouse position and is mouse pressed
         :return:
         """
-        if self.economy_mode:
-            return
-        pos = args[0]
-        state = args[1]
+        if "mouse_pos" in kwargs and "btn_id" in kwargs:
+            pos = kwargs["mouse_pos"]
+            state = kwargs["btn_id"]
+        else:
+            state = False
         if state:
             if not self.robot.going_to_pos_sent:
                 self.go_to_pos(*pos)
@@ -449,7 +450,7 @@ class GuiControl:
                 break
             color = (255, 255, 255)
 
-    def mouse_on_arm(self, *args):
+    def mouse_on_arm(self, *args, **kwargs):
         """
         service function. Called when mouse is on arm work area.
         Draws target. If mouse pressed changes manipulator target position
@@ -458,8 +459,12 @@ class GuiControl:
         """
         if self.economy_mode:
             return
-        pos = args[0]
-        pressed = args[1]
+        if "mouse_pos" in kwargs:
+            pos = kwargs["mouse_pos"]
+        if "btn_id" in kwargs:
+            pressed = kwargs["btn_id"]
+        else:
+            pressed = False
         self.target[1] = (self.screen.mouse_wheel_pos / 10 + math.pi / 2) % (2 * math.pi)
         target = [[(pos[0] - self.start_point_x) * self.cylindrical_scale,
                    (-pos[1] + self.arm_height - self.start_point_y) * self.cylindrical_scale], self.target[1]]

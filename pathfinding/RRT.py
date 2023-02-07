@@ -1,26 +1,31 @@
 import numpy as np
 import scipy
 import scipy.spatial
+from numba import njit
 
 
-def find_closest(target, src=np.array(False), n=1, /, dist_limit=None):
-    out = [[], []]
-    if src.any():
-        nodes_tree = scipy.spatial.cKDTree(src)
-        _res = nodes_tree.query(target, n)
-        res = list(_res)
-        if isinstance(_res[0], float):
-            res[0] = [_res[0]]
-        if isinstance(_res[1], int):
-            res[1] = [_res[1]]
+@njit(fastmath=True)
+def fast_closest(target, src, out_ind, out_dist, n):
+    for p in range(1, len(src)):
+        point = src[p]
+        dist = np.linalg.norm(point - target)
+        for i in range(n):
+            if out_dist[i] > dist:
+                out_dist[i] = dist
+                out_ind[i] = p
+                for j in range(n - 1, i, -1):
+                    out_ind[j] = out_ind[j - 1]
+                    out_dist[j] = out_dist[j - 1]
+                break
 
-        for i in range(len(res[1])):
-            if res[1][i] < len(src) and (not dist_limit or res[0][i] < dist_limit):
-                out[0].append(res[0][i])
-                out[1].append(res[1][i])
-        if len(out) > 0:
-            return out
-    return [None, None]
+
+def find_closest(target, src, n=1, /, dist_limit=None):
+    target = target.astype(np.float32)
+    out_ind = np.zeros(n).astype(np.uint32)
+    out_dist = np.zeros(n).astype(np.float32)
+    out_dist[0] = np.linalg.norm(src[0] - target)
+    fast_closest(target, src, out_ind, out_dist, n)
+    return [out_dist[:n], out_ind[:n]]
 
 
 class RRT:
@@ -39,7 +44,7 @@ class RRT:
 
         self.graph = dict()
         self.graph[0] = [None, [], 0]
-        self.nodes = np.array(start_point).astype(np.uint32)
+        self.nodes = np.array(start_point).astype(np.float32)
         self.node_num = 1
         map_shape = self.bool_map.shape
         self.map_shape = (map_shape - np.ones(len(map_shape))).astype(np.uint32)
@@ -58,7 +63,7 @@ class RRT:
         if not start_point.any():
             print("No start point")
         assert start_point.any()
-        #if not end_point.any():
+        # if not end_point.any():
         #    print("No end point")
         assert end_point.any()
         if not bin_map.any():
@@ -110,7 +115,7 @@ class RRT:
 
     def find_best_connection(self, new_node, neighbours):
         neighbours = [[i, self.nodes[i], *self.graph[i]] for i in neighbours]
-        neighbours.sort(key=lambda x: x[-1])
+        neighbours.sort(key=lambda x: x[-1], reverse=False)
         have_parent = False
         for i in neighbours:
             _, dist, reached = self.check_obstacle(new_node, i[1])
@@ -136,21 +141,20 @@ class RRT:
 
     def add_node_to_closest(self, new_node):
         _, closest_node = find_closest(new_node, self.nodes)
-        if closest_node:
-            node, dist, _ = self.check_obstacle(self.nodes[closest_node[0]], new_node)
-            if node.any():
-                if self.star:
-                    _, neighbors = find_closest(node, self.nodes, 10, dist_limit=self.growth_factor)
-                    self.find_best_connection(node, neighbors)
-                else:
-                    self.nodes = np.append(self.nodes, [node], axis=0).astype(np.uint32)
-                    self.graph[self.node_num] = [closest_node[1], [], dist + self.graph[closest_node[1]][2]]
-                    self.graph[closest_node[1]][1].append(self.node_num)
-                    self.node_num += 1
-
-                return node
+        node, dist, _ = self.check_obstacle(self.nodes[closest_node[0]], new_node)
+        if node.any():
+            if self.star:
+                _, neighbors = find_closest(node, self.nodes, 10, dist_limit=self.growth_factor)
+                self.find_best_connection(node, neighbors)
             else:
-                return np.array(False)
+                self.nodes = np.append(self.nodes, [node], axis=0).astype(np.uint32)
+                self.graph[self.node_num] = [closest_node[1], [], dist + self.graph[closest_node[1]][2]]
+                self.graph[closest_node[1]][1].append(self.node_num)
+                self.node_num += 1
+
+            return node
+        else:
+            return np.array(False)
 
     def add_random(self):
         random_point = (np.random.rand(len(self.map_shape)) * self.map_shape).astype(np.uint32)

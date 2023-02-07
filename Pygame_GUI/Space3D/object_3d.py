@@ -46,7 +46,7 @@ class Hollow3D(Object3D):
                  vertex_radius=''):
         super().__init__(render, pos)
         if vertices:
-            self.vertices = np.array([np.array(v) for v in vertices]).astype(float_bit)
+            self.vertices = np.array([np.array(v).astype(float_bit) for v in vertices]).astype(float_bit)
         if edges:
             self.edges = np.array(edges).astype(np.uint32)
         if edges_thickness:
@@ -63,7 +63,6 @@ class Hollow3D(Object3D):
             self.vertex_radius = np.array([10] * len(self.vertices)).astype(np.int16)
         self.center_of_mass = np.mean(self.vertices, axis=0).astype(float_bit)
         self.font = pg.font.SysFont('Arial', 30, bold=True)
-        self.color_edges = np.array([[255, 255, 255] for _ in self.edges]).astype(np.uint32)
         self.label = ''
 
         self.color_edges = np.array([[255, 255, 255] for _ in self.edges]).astype(np.uint32)

@@ -158,8 +158,7 @@ class RRT_sim:
                 self.robot.going_to_target_pos = False
                 self.last_checked_pressed_keys = pressed_keys[:]
 
-        if self.screen_obj.mouse_clicked:
-            self.screen_obj.mouse_clicked = False
+        if self.screen_obj.mouse_state[1]:
             if not self.start_point.any():
                 #self.start_point = np.array([self.screen_to_arr(self.screen_obj.mouse_pos)]).astype(int)
                 self.start_point = (np.array([self.robot.increment[:2]])*self.discrete+np.array(self.map_shape).T/2).astype(int)
