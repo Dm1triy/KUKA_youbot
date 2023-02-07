@@ -81,11 +81,14 @@ class RRT:
             iters_made = i
             all_shift = np.copy(shift_vector * i)
             c_point = np.around(point1 + shift_vector * i).astype(np.int64)
-            if self.bool_map[tuple(c_point)]:
-                i -= 1
-                iters_made = i
-                break
-            if np.linalg.norm(shift_vector * i) >= self.growth_factor:
+            try:
+                if self.bool_map[tuple(c_point)]:
+                    i -= 1
+                    iters_made = i
+                    break
+                if np.linalg.norm(shift_vector * i) >= self.growth_factor:
+                    break
+            except IndexError:
                 break
         if np.linalg.norm(all_shift) < self.e or not c_point.any():
             return np.array(False), None, False

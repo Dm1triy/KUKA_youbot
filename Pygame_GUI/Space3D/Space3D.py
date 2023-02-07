@@ -3,6 +3,7 @@ from Pygame_GUI.Space3D.object_3d import *
 from Pygame_GUI.Space3D.camera import *
 from Pygame_GUI.Space3D.projection import *
 from Pygame_GUI.Space3D.fast_math import *
+from Pygame_GUI.constants import *
 
 
 class Space3D:
@@ -11,15 +12,18 @@ class Space3D:
                  x=0,
                  y=0,
                  width=0,
-                 height=0):
+                 height=0,
+                 real_width=WIDTH,
+                 real_height=HEIGHT):
         self.par_surf = par_surf
         self.ps_width, self.ps_height = par_surf.width, par_surf.height
         self.x = int(x * self.ps_width)
         self.y = int(y * self.ps_height)
         self.width, self.height = int(width * self.ps_width), int(height * self.ps_height)
+        self.real_width, self.real_height = int(real_width), int(real_height)
         self.h_width, self.h_height = self.width // 2, self.height // 2
-        self.color_mat = np.zeros((self.width, self.height, 3), dtype=np.uint32)
-        self.depth_mat = np.zeros((self.width, self.height), dtype=float_bit)
+        self.color_mat = np.zeros((self.real_width, self.real_height, 3), dtype=np.uint32)
+        self.depth_mat = np.zeros((self.real_width, self.real_height), dtype=float_bit)
         self.func = lambda *args: args
         self.last_drag_pos = (0, 0)
         self.last_mouse_wheel = 0
@@ -56,15 +60,15 @@ class Space3D:
 
     @property
     def surf(self):
-        self.color_mat = np.zeros((self.width, self.height, 3), dtype=np.int32)
-        self.depth_mat = np.zeros((self.width, self.height), dtype=np.float64)
+        self.color_mat = np.zeros((self.real_width, self.real_height, 3), dtype=np.int32)
+        self.depth_mat = np.zeros((self.real_width, self.real_height), dtype=np.float64)
         self.operating_surf.fill(pg.Color('darkslategray'))
         for i in self.all_obj:
             i.draw()
         #return self.operating_surf
         #maybe blit_array
         arr = ""
-        return pg.surfarray.make_surface(self.color_mat)
+        return pg.transform.scale(pg.surfarray.make_surface(self.color_mat), (self.width, self.height))
 
     def add_object(self, obj):
         self.all_obj.append(obj)

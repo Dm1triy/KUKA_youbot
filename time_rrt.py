@@ -10,18 +10,18 @@ class TimeRrtGui:
     def __init__(self, width, height):
         self.map_shape = (30, 30, 100)
         self.width, self.height = width, height
-        self.screen = Screen(self.width, self.height)
+        self.screen = Screen(1000, 1000)
         self.space_3d = Space3D(self.screen, x=0, y=0, width=1, height=1)
         self.old_pressed_keys = []
         self.old_mouse_pos = [0, 0]
         self.fps_text = Text(self.screen, x=0.1, y=0.01, inp_text=self.screen.get_fps, font='serif', font_size=10)
         # self.space_3d.load_object_from_file("Pygame_GUI/Space3D/teapot.obj", (5, 0, 0))
-        self.cube = (self.space_3d, [*np.array([(-1, -1, -1, 1), (1, -1, -1, 1), (-1, 1, -1, 1), (-1, -1, 1, 1),
-                                                (1, 1, -1, 1), (1, -1, 1, 1),
-                                                (-1, 1, 1, 1), (1, 1, 1, 1)]) / 2],
+        self.cube = (self.space_3d, [*np.array([(-1, -1, -1, 2), (1, -1, -1, 2), (-1, 1, -1, 2), (-1, -1, 1, 2),
+                                                (1, 1, -1, 2), (1, -1, 1, 2),
+                                                (-1, 1, 1, 2), (1, 1, 1, 2)]) / 2],
                      [[0, 1, 4, 2][::-1], [3, 6, 7, 5][::-1], [0, 3, 5, 1][::-1], [2, 4, 7, 6][::-1],
                       [1, 5, 7, 4][::-1], [2, 6, 3, 0][::-1]])
-        self.space_3d.add_object(Axes(self.space_3d))
+        #self.space_3d.add_object(Axes(self.space_3d))
         Button(self.screen, x=0.9, y=0.01, width=0.08, height=0.06, color=(150, 255, 170), func=self.change_cam_mode)
         self.bin_map = np.zeros(self.map_shape).astype(np.uint8)
         # self.generate_random_map()
@@ -45,21 +45,19 @@ class TimeRrtGui:
                         self.space_3d.add_object(Solid3D(*self.cube, (
                             i - self.map_shape[0] / 2, j - self.map_shape[1] / 2, k - self.map_shape[2] / 2)))
                         self.bin_map[i, j, k] = 1
-                        print([i, j, k])
-            print(i)
 
     def manual_map(self):
         self.bin_map[:, :, 20] = np.ones(self.map_shape[:2])
         self.bin_map[:, :, 50] = np.ones(self.map_shape[:2])
         self.bin_map[:, :, 70] = np.ones(self.map_shape[:2])
 
-        ind = (*(np.random.rand(2) * 20).astype(int), 20)
+        ind = (*(np.random.rand(2) * 9).astype(int)+15, 20)
         ind1 = (ind[0] - 15, ind[1] - 15, ind[2] - 50, 0)
         self.bin_map[ind[0]-5:ind[0]+5, ind[1]-5:ind[1]+5, ind[2]] = 0
-        ind = (*(np.random.rand(2) * 20).astype(int), 50)
+        ind = (*(np.random.rand(2) * 9).astype(int)+15, 50)
         ind2 = (ind[0] - 15, ind[1] - 15, ind[2] - 50, 0)
         self.bin_map[ind[0]-5:ind[0]+5, ind[1]-5:ind[1]+5, ind[2]] = 0
-        ind = (*(np.random.rand(2) * 20).astype(int), 70)
+        ind = (*(np.random.rand(2) * 9).astype(int)+15, 70)
         ind3 = (ind[0] - 15, ind[1] - 15, ind[2] - 50, 0)
         self.bin_map[ind[0]-5:ind[0]+5, ind[1]-5:ind[1]+5, ind[2]] = 0
 
@@ -94,10 +92,14 @@ class TimeRrtGui:
                             i - self.map_shape[0] / 2, j - self.map_shape[1] / 2, k - self.map_shape[2] / 2)))
 
     def run(self):
+        self.rrt.step()
+        self.rrt.step()
+        self.rrt.step()
         while self.screen.running:
             self.screen.step()
-            self.draw_tree()
             self.rrt.step()
+            self.draw_tree()
+
 
     def draw_tree(self):
         nodes = []
@@ -106,13 +108,13 @@ class TimeRrtGui:
         edges = []
         for i in range(1, self.rrt.node_num):
             n = self.rrt.graph[i][0]
-            edges.append(np.array([i, n]))
+            edges.append(np.array([i, n]).astype(np.uint16))
         self.tree.edges_thickness = np.array([1] * len(edges)).astype(np.int16)
         self.tree.vertex_colors = np.array([[255, 255, 255] for _ in nodes]).astype(np.uint32)
         self.tree.vertex_radius = np.array([2] * len(nodes)).astype(np.int16)
         self.tree.color_edges = np.array([[255, 255, 255] for _ in edges]).astype(np.uint32)
         self.tree.vertices = np.array(nodes)
-        self.tree.edges = np.array(edges)
+        self.tree.edges = np.array(edges).astype(np.uint32)
 
     def change_cam_mode(self, *args, **kwargs):
         self.space_3d.camera.mode = not self.space_3d.camera.mode

@@ -34,8 +34,8 @@ class Camera:
         self.pos_serv = np.array([*self.init_pos, 1.0])
         self.transition = np.array([0, 0, 0, 0])
         self.rotation = [0, 0]
-        self.near_plane = 0.1
-        self.far_plane = 100
+        self.near_plane = NEAR_PLANE
+        self.far_plane = FAR_PLANE
         self.moving_speed = 0.3
         self.zoom_speed = 3
         self.rotation_speed = 0.011
