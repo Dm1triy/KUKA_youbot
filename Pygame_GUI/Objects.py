@@ -17,8 +17,14 @@ class NoCvMatSet(Exception):
     pass
 
 
+class NoDrawFuncReloaded(Exception):
+    """Raised when sprite draw func is not reloaded in child class"""
+    pass
+
+
 class Sprite:
     def __init__(self, par_surf, /,
+                 name="Sprite",
                  x=0,
                  y=0,
                  width=0,
@@ -26,17 +32,17 @@ class Sprite:
                  func=lambda *args, **kwargs: args,
                  color=(100, 100, 100)):
         self.func = func
+        self.name = name
         self.par_surf = par_surf
+        self.surface = self.par_surf.screen
         self.ps_width, self.ps_height = par_surf.width, par_surf.height
         self.x = int(x * self.ps_width)
         self.y = int(y * self.ps_height)
+        self.pos = self.x, self.y
         self.width = int(width * self.ps_width)
         self.height = int(height * self.ps_height)
         self.color = color
-        if width != 0 and height != 0:
-            self.surf = pg.Surface((self.width, self.height))
-            self.surf.fill(self.color)
-            self.rect = par_surf.add_object(self)
+        self.rect = pg.Rect(self.x, self.y, self.width, self.height)
 
     def pressed(self, *args, **kwargs):
         pass
@@ -49,8 +55,12 @@ class Sprite:
 
     def update(self):
         pass
+
     def convert_to_local(self, coords):
-        return coords[0]-self.x, coords[1]-self.y
+        return coords[0] - self.x, coords[1] - self.y
+
+    def draw(self):
+        raise NoDrawFuncReloaded
 
 
 class Button(Sprite):
@@ -59,6 +69,9 @@ class Button(Sprite):
 
     def pressed(self, *args, **kwargs):
         self.func(*args, **kwargs)
+
+    def draw(self):
+        pg.draw.rect(self.surface, self.color, self.rect)
 
 
 class Text(Sprite):
@@ -69,17 +82,17 @@ class Text(Sprite):
                  font_size=10, **kwargs):
         super().__init__(par_surf, color=color, **kwargs)
         self.inp_text = inp_text
-        self.text = inp_text
         self.text = pg.font.SysFont(font, int(font_size * self.ps_height / 500))
-        self.surf = self.text.render(str(self.inp_text()), True, self.color)
-        self.rect = par_surf.add_object(self)
+        self.txt_render = self.text.render(str(self.inp_text()), True, self.color)
 
     def pressed(self, *args, **kwargs):
         self.func(args, **kwargs)
 
     def update(self):
-        self.surf = self.text.render(str(self.inp_text()), True, self.color)
+        self.txt_render = self.text.render(str(self.inp_text()), True, self.color)
 
+    def draw(self):
+        self.rect = self.surface.blit(self.txt_render, self.pos)
 
 
 class Slider(Sprite):
@@ -101,10 +114,6 @@ class Slider(Sprite):
             self.val = self.min
 
         self.slider_x = convert_range(self.slider_rad, self.width - self.slider_rad, self.min, self.max, self.val)
-        self.surf.fill((0,0,0))
-
-        pg.draw.rect(self.surf, self.color, (0, 0, self.width, self.height), border_radius=self.height // 2)
-        pg.draw.circle(self.surf, (255, 255, 255), (self.slider_x, self.slider_y), self.slider_rad)
 
     def set_val(self, val):
         self.slider_x = convert_range(self.slider_rad, self.width - self.slider_rad, self.min, self.max, val)
@@ -116,15 +125,19 @@ class Slider(Sprite):
         self.func(self.val)
 
     def update(self):
-        pg.draw.rect(self.surf, self.color, (0, 0, self.width, self.height), border_radius=self.height // 2)
-        pg.draw.circle(self.surf, (255, 255, 255), (self.slider_x, self.slider_y), self.slider_rad)
+        pg.draw.rect(self.surface, self.color, (0, 0, self.width, self.height), border_radius=self.height // 2)
+        pg.draw.circle(self.surface, (255, 255, 255), (self.slider_x, self.slider_y), self.slider_rad)
+
+    def draw(self):
+        self.slider_x = convert_range(self.slider_rad, self.width - self.slider_rad, self.min, self.max, self.val)
+        pg.draw.rect(self.surface, self.color, (self.x, self.y, self.width, self.height), border_radius=self.height // 2)
+        pg.draw.circle(self.surface, (255, 255, 255), (self.x+self.slider_x, self.y+self.slider_y), self.slider_rad)
 
 
 class Mat(Sprite):
     def __init__(self, par_surf, /,
                  cv_mat_stream=None,
                  **kwargs):
-
 
         if cv_mat_stream:
             self.cv_mat_stream = cv_mat_stream
@@ -134,22 +147,17 @@ class Mat(Sprite):
         self.is_mat_stream = False
         self.last_hover_pos = (0, 0)
         self.is_pressed = False
-        self.rect = par_surf.add_object(self)
 
-    @property
-    def surf(self):
+    def draw(self):
         mat = self.cv_mat_stream()
         if self.width != 0 and self.height != 0:
-            surf = pg.transform.flip(pg.transform.scale(pg.transform.rotate(pg.surfarray.make_surface(mat), -90),
-                                                        (self.width, self.height)), 1, 0)
+            self.rect = self.surface.blit(pg.transform.flip(
+                pg.transform.scale(pg.transform.rotate(pg.surfarray.make_surface(mat), -90), (self.width, self.height)),
+                1, 0), self.pos)
         else:
-            surf = pg.transform.flip(pg.transform.rotate(pg.surfarray.make_surface(mat), -90), 1, 0)
-        return surf
-
-    @surf.setter
-    def surf(self, value):
-        pass
-
+            self.rect = self.surface.blit(
+                pg.transform.flip(pg.transform.rotate(pg.surfarray.make_surface(mat), -90), 1, 0),
+                self.pos)
 
     def update(self):
         self.func(mouse_pos=self.last_hover_pos, btn_id=self.is_pressed)

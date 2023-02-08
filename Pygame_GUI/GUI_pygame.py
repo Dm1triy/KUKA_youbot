@@ -33,22 +33,25 @@ class GuiControl:
         # window properties
         self.width = width
         self.height = height
+        self.screen = Screen(self.width, self.height)
 
         # arm window settings
-        self.cylindrical_scale = (1 / self.height)*1000
-        self.arm_width = int(0.4839*self.width)
-        self.arm_height = int(self.height*0.6154)
+        self.cylindrical_scale = (1 / self.height) * 1000
+        self.arm_width = int(0.4839 * self.width)
+        self.arm_height = int(self.height * 0.6154)
         self.start_point_x = int(self.arm_width // 2 - 30 / self.cylindrical_scale)
         self.start_point_y = int(self.arm_height // 2 - 50 / self.cylindrical_scale)
         self.move_body_scale = 30
         self.economy_mode = False
 
         # canvases
-        self.arm_background = np.array([[[20, 70, 190]] * int(0.4839*self.width)] * int(self.height*0.6154), dtype=np.uint8)
+        self.arm_background = np.array([[[20, 70, 190]] * int(0.4839 * self.width)] * int(self.height * 0.6154),
+                                       dtype=np.uint8)
         self.arm_screen = np.copy(self.arm_background)
 
-        self.body_pos_background = np.array([[[20, 70, 190]] * int(0.2419*self.width)] * int(self.height*0.3846), dtype=np.uint8)
-        self.body_pos_screen_wh = [int(0.2419*self.width)//2, int(self.height*0.3846)//2]
+        self.body_pos_background = np.array([[[20, 70, 190]] * int(0.2419 * self.width)] * int(self.height * 0.3846),
+                                            dtype=np.uint8)
+        self.body_pos_screen_wh = [int(0.2419 * self.width) // 2, int(self.height * 0.3846) // 2]
         self.body_pos_screen = np.copy(self.body_pos_background)
         # arm parameters
         self.m2_ang_offset = - math.pi
@@ -87,56 +90,36 @@ class GuiControl:
             m1_ang, m2_ang, m3_ang, m4_ang, m5_ang, grip = *self.robot.arm, 0.2
         else:
             m1_ang, m2_ang, m3_ang, m4_ang, m5_ang, grip = 0, 0, 0, 0, 0, 0.2
-        self.screen = Screen(self.width, self.height)
-        Button(self.screen, x=0.6, y=0.897, width=0.08, height=0.06, color=(150, 255, 170), func=self.change_cam_mode)
-        Button(self.screen, x=0.726, y=0.897, width=0.08, height=0.06, color=(150, 255, 170), func=self.reset_arm)
-        self.m1_slider = Slider(self.screen,
-                                min=157, max=-134, val=m1_ang,
-                                x=0.556, y=0.641,
-                                width=0.403, height=0.025,
-                                color=(150, 160, 170),
-                                func=self.change_m1_angle)
-        self.m2_slider = Slider(self.screen,
-                                min=-84, max=63, val=m2_ang,
-                                x=0.556, y=0.679,
-                                width=0.403, height=0.025,
-                                color=(150, 160, 170),
-                                func=self.change_m2_angle)
-        self.m3_slider = Slider(self.screen, min=-135, max=110, val=m3_ang,
-                                x=0.556, y=0.718,
-                                width=0.403, height=0.025,
-                                color=(150, 160, 170),
-                                func=self.change_m3_angle)
-        self.m4_slider = Slider(self.screen, min=-90, max=95, val=m4_ang,
-                                x=0.556, y=0.756,
-                                width=0.403, height=0.025,
-                                color=(150, 160, 170),
-                                func=self.change_m4_angle)
-        self.m5_slider = Slider(self.screen, min=-145, max=96, val=m5_ang,
-                                x=0.556, y=0.795,
-                                width=0.403, height=0.025,
-                                color=(150, 160, 170),
-                                func=self.change_m5_angle)
-        self.grip_slider = Slider(self.screen, min=0.001, max=1.98, val=grip,
-                                  x=0.556, y=0.833,
-                                  width=0.403, height=0.025,
-                                  color=(150, 160, 170),
-                                  func=self.change_grip)
 
-        self.robot_cam_pygame = Mat(self.screen, x=0, y=0, width=0.5261, height=0.6154, cv_mat_stream=self.cam_stream)
-        self.body_pos_pygame = Mat(self.screen, x=0, y=0.615, cv_mat_stream=self.body_pos_stream,
-                                   func=self.update_body_pos)
-        self.arm_pygame = Mat(self.screen, x=0.516, y=0, cv_mat_stream=self.arm_stream, func=self.mouse_on_arm)
-        self.pos_text_x = Text(self.screen,
-                               x=0.024, y=0.949,
-                               inp_text=self.output_pos_text_x,
-                               font='serif',
-                               font_size=10)
-        self.pos_text_y = Text(self.screen,
-                               x=0.105, y=0.949,
-                               inp_text=self.output_pos_text_y,
-                               font='serif',
-                               font_size=10)
+        self.screen.init()
+
+        # layout
+        self.screen.sprite(Button, "cam_mode_btn", x=0.6, y=0.897, width=0.08, height=0.06,
+                           color=(150, 255, 170), func=self.change_cam_mode)
+        self.screen.sprite(Button, "reset_arm_btn", x=0.726, y=0.897, width=0.08, height=0.06,
+                           color=(150, 255, 170), func=self.reset_arm)
+
+        self.screen.sprite(Slider, "m1_slider", min=157, max=-134, val=m1_ang, x=0.556, y=0.641,
+                           width=0.403, height=0.025, color=(150, 160, 170), func=self.change_m1_angle)
+        self.screen.sprite(Slider, "m2_slider", min=-84, max=63, val=m2_ang, x=0.556, y=0.679,
+                           width=0.403, height=0.025, color=(150, 160, 170), func=self.change_m2_angle)
+        self.screen.sprite(Slider, "m3_slider", min=-135, max=110, val=m3_ang, x=0.556, y=0.718,
+                           width=0.403, height=0.025, color=(150, 160, 170), func=self.change_m3_angle)
+        self.screen.sprite(Slider, "m4_slider", min=-90, max=95, val=m4_ang, x=0.556, y=0.756,
+                           width=0.403, height=0.025, color=(150, 160, 170), func=self.change_m4_angle)
+        self.screen.sprite(Slider, "m5_slider", min=-145, max=96, val=m5_ang, x=0.556, y=0.795,
+                           width=0.403, height=0.025, color=(150, 160, 170), func=self.change_m5_angle)
+        self.screen.sprite(Slider, "grip_slider", min=0.001, max=1.98, val=grip, x=0.556, y=0.833,
+                           width=0.403, height=0.025, color=(150, 160, 170), func=self.change_grip)
+        # m1_slider
+
+        self.screen.sprite(Mat, "camera", x=0, y=0, width=0.5261, height=0.6154, cv_mat_stream=self.cam_stream)
+        self.screen.sprite(Mat, "position", x=0, y=0.615, cv_mat_stream=self.body_pos_stream, func=self.update_body_pos)
+        self.screen.sprite(Mat, "arm", x=0.516, y=0, cv_mat_stream=self.arm_stream, func=self.mouse_on_arm)
+
+        self.screen.sprite(Text, "pos_x", x=0.024, y=0.949, inp_text=self.output_pos_text_x, font='serif', font_size=10)
+        self.screen.sprite(Text, "pos_y", x=0.105, y=0.949, inp_text=self.output_pos_text_y, font='serif', font_size=10)
+        self.screen.add_fps_indicator()
 
     def reset_arm(self, *args, **kwargs):
         self.robot.move_arm(0, 56, -80, -90, 0, 2)
@@ -301,7 +284,6 @@ class GuiControl:
             else:
                 grip = 0.01
 
-
         self.move_speed[1] = side * self.move_speed_val
         if self.last_checked_pressed_keys != pressed_keys:
             self.robot.move_base(*self.move_speed)
@@ -312,7 +294,6 @@ class GuiControl:
                 self.grip_pos = grip
         if self.robot.arm[0] != arm_rot:
             self.robot.move_arm(m1=arm_rot)
-
 
     def update_lidar(self):
         """
@@ -328,7 +309,8 @@ class GuiControl:
                 else:
                     self.old_body_pos = buff
                     self.old_lidar = lidar
-                cent_y, cent_x = y * self.move_body_scale + self.body_pos_screen_wh[0], -x * self.move_body_scale + self.body_pos_screen_wh[0]
+                cent_y, cent_x = y * self.move_body_scale + self.body_pos_screen_wh[0], -x * self.move_body_scale + \
+                                 self.body_pos_screen_wh[0]
                 cent_y = int(cent_y - 0.3 * self.move_body_scale * math.cos(ang + math.pi / 2))
                 cent_x = int(cent_x - 0.3 * self.move_body_scale * math.sin(ang + math.pi / 2))
                 for l in range(0, len(lidar), 5):
@@ -365,7 +347,8 @@ class GuiControl:
             cv2.circle(self.body_pos_screen, (x, y), 3, (100, 255, 100), -1)
             x, y, ang = self.robot.increment
             cv2.circle(self.body_pos_screen,
-                       (int(y * self.move_body_scale + self.body_pos_screen_wh[0]), int(-x * self.move_body_scale + self.body_pos_screen_wh[1])),
+                       (int(y * self.move_body_scale + self.body_pos_screen_wh[0]),
+                        int(-x * self.move_body_scale + self.body_pos_screen_wh[1])),
                        max(1, int(0.05 * self.move_body_scale)), (255, 255, 255), -1)
             size = 30 * self.move_body_scale // 100
             xl1 = int(size * math.cos(ang + math.pi / 2))
@@ -410,7 +393,8 @@ class GuiControl:
         :return:
         """
         self.target_body_pos = [int(x), int(y), 0]
-        x, y = (x - self.body_pos_screen_wh[0]) / self.move_body_scale, (-y + self.body_pos_screen_wh[1]) / self.move_body_scale
+        x, y = (x - self.body_pos_screen_wh[0]) / self.move_body_scale, (
+                -y + self.body_pos_screen_wh[1]) / self.move_body_scale
         self.robot.go_to(y, x)
 
     def update_arm(self, scale=1.0):
@@ -421,8 +405,8 @@ class GuiControl:
         """
         self.arm_screen = np.copy(self.arm_background)
         m1_ang, m2_ang, m3_ang, m4_ang, m5_ang, grip = *map(math.radians, self.robot.arm_pos[0][:-1]), \
-        self.robot.arm_pos[0][
-            -1]
+            self.robot.arm_pos[0][
+                -1]
         color = (100, 100, 255)
 
         for i in range(2):
@@ -477,12 +461,12 @@ class GuiControl:
         else:
             color = ((100, 255, 100) if available else (240, 100, 100))
         m1_ang, m2_ang, m3_ang, m4_ang, m5_ang, grip = self.robot.arm_pos[0]
-        self.m1_slider.set_val(m1_ang)
-        self.m2_slider.set_val(m2_ang)
-        self.m3_slider.set_val(m3_ang)
-        self.m4_slider.set_val(m4_ang)
-        self.m5_slider.set_val(m5_ang)
-        self.grip_slider.set_val(grip)
+        self.screen["m1_slider"].set_val(m1_ang)
+        self.screen["m2_slider"].set_val(m2_ang)
+        self.screen["m3_slider"].set_val(m3_ang)
+        self.screen["m4_slider"].set_val(m4_ang)
+        self.screen["m5_slider"].set_val(m5_ang)
+        self.screen["grip_slider"].set_val(grip)
         cv2.circle(self.arm_screen, (int(pos[0]), int(pos[1])), 10, color, 4)
         size = 20
         xs = int(pos[0] + size * 0.6 * math.cos(-self.target[1] - math.pi / 2))

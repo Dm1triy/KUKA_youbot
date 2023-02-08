@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit
 
-from Pygame_GUI.Space3D.constants import *
+from Pygame_GUI.Space3D.pre_settings import *
 
 
 @njit(fastmath=True)
@@ -18,7 +18,14 @@ def range_cut(mi, ma, num):
 
 
 @njit(fastmath=True)
-def render_vertices(color_mat, depth_mat, vertices, vertex_colors, vertex_radius):
+def set_pixel(color_mat, depth_mat, priority_mat, x, y, color, depth, priority):
+    color_mat[x, y, :] = color
+    depth_mat[x, y] = depth
+    priority_mat[x, y] = priority
+
+
+@njit(fastmath=True)
+def render_vertices(color_mat, depth_mat, priority_mat, vertices, vertex_colors, vertex_radius):
     for vertex in range(len(vertices)):
         x0, y0, z0, w0 = vertices[vertex]
         if w0 <= 0:
@@ -29,17 +36,24 @@ def render_vertices(color_mat, depth_mat, vertices, vertex_colors, vertex_radius
         if not (0 <= xp0 < WIDTH and 0 <= yp0 < HEIGHT):
             continue
         rad = vertex_radius[vertex]
-        if depth_mat[xp0, yp0] >= z0 or depth_mat[xp0, yp0] == 0.0:
-            for dx in range(-rad, rad):
-                for dy in range(-rad, rad):
-                    cx, cy = xp0 + dx, yp0 + dy
-                    if 0 <= cx < WIDTH and 0 <= cy < HEIGHT and dx ** 2 + dy ** 2 < rad ** 2:
-                        color_mat[cx, cy, :] = vertex_colors[vertex]
-                        depth_mat[cx, cy] = z0
+        dist = z0
+        if depth_mat[xp0, yp0] + jitter > dist > depth_mat[xp0, yp0] - jitter:
+            if priority_mat[xp0, yp0] < dist and priority_mat[xp0, yp0] != 0:
+                continue
+        elif depth_mat[xp0, yp0] < dist and depth_mat[xp0, yp0] != 0:
+            continue
+        for dx in range(-rad, rad):
+            for dy in range(-rad, rad):
+                cx, cy = xp0 + dx, yp0 + dy
+                if 0 <= cx < WIDTH and 0 <= cy < HEIGHT and dx ** 2 + dy ** 2 < rad ** 2:
+                    set_pixel(color_mat, depth_mat, priority_mat, cx, cy, vertex_colors[vertex], z0, z0)
+                    # color_mat[cx, cy, :] = vertex_colors[vertex]
+                    # depth_mat[cx, cy] = z0
+                    # priority_mat[cx, cy] = z0
 
 
 @njit(fastmath=True)
-def render_edges(color_mat, depth_mat, vertices, edges, edge_colors, thickness):
+def render_edges(color_mat, depth_mat, priority_mat, vertices, edges, edge_colors, thickness):
     for edge in range(len(edges)):
         all_vert = vertices[edges[edge]]
         th = thickness[edge]
@@ -66,13 +80,19 @@ def render_edges(color_mat, depth_mat, vertices, edges, edge_colors, thickness):
                 if not 1 > xp > -1:
                     continue
                 cx = int((xp + 1) / 2 * WIDTH)
-                zp = zl * (yp - y0) / yl + z0
-                if depth_mat[cx, cy] > zp or depth_mat[cx, cy] == 0.0:
-                    for t in range(-th // 2, th // 2):
-                        ind = range_cut(0, WIDTH-1, int(cx + t))
-                        color_mat[ind, cy, :] = edge_colors[edge]
-                        #color_mat[ind, cy, :] = [zp * 50, zp * 50, zp * 50]
-                        depth_mat[ind, cy] = zp
+                dist = zl * (yp - y0) / yl + z0
+                if depth_mat[cx, cy] + jitter > dist > depth_mat[cx, cy] - jitter:
+                    if priority_mat[cx, cy] < dist and priority_mat[cx, cy] != 0:
+                        continue
+                elif depth_mat[cx, cy] < dist and depth_mat[cx, cy] != 0:
+                    continue
+                for t in range(-th // 2, th // 2):
+                    ind = range_cut(0, WIDTH - 1, int(cx + t))
+                    set_pixel(color_mat, depth_mat, priority_mat, ind, cy, edge_colors[edge], dist, dist)
+                    # color_mat[ind, cy, :] = edge_colors[edge]
+                    # color_mat[ind, cy, :] = [zp * 50, zp * 50, zp * 50]
+                    # depth_mat[ind, cy] = zp
+                    # priority_mat[cx, cy] = zp
         else:
             for cx in range(bbx_min, bbx_max):
                 xp = cx / WIDTH * 2 - 1
@@ -80,23 +100,31 @@ def render_edges(color_mat, depth_mat, vertices, edges, edge_colors, thickness):
                 if not 1 > yp > -1:
                     continue
                 cy = int((1 - yp) / 2 * HEIGHT)
-                zp = zl * (xp - x0) / xl + z0
-                if depth_mat[cx, cy] > zp or depth_mat[cx, cy] == 0.0:
-                    for t in range(-th // 2, th // 2):
-                        ind = range_cut(0, HEIGHT-1, int(cy + t))
-                        color_mat[cx, ind, :] = edge_colors[edge]
-                        #color_mat[cx, ind, :] = [zp*50, zp*50, zp*50]
+                dist = zl * (xp - x0) / xl + z0
+                if depth_mat[cx, cy] + jitter > dist > depth_mat[cx, cy] - jitter:
+                    if priority_mat[cx, cy] < dist and priority_mat[cx, cy] != 0:
+                        continue
+                elif depth_mat[cx, cy] < dist and depth_mat[cx, cy] != 0:
+                    continue
+                for t in range(-th // 2, th // 2):
+                    ind = range_cut(0, HEIGHT - 1, int(cy + t))
+                    set_pixel(color_mat, depth_mat, priority_mat, cx, ind, edge_colors[edge], dist, dist)
+                    # color_mat[cx, ind, :] = edge_colors[edge]
+                    # color_mat[cx, ind, :] = [zp*50, zp*50, zp*50]
 
-                        depth_mat[cx, ind] = zp
+                    # depth_mat[cx, ind] = zp
+                    # priority_mat[cx, cy] = z0
 
 
 @njit(fastmath=True)
-def render_polygons(color_mat, depth_mat, vertices, faces, normals, face_colors):
+def render_polygons(color_mat, depth_mat, priority_mat, vertices, faces, normals, face_colors):
     for face in range(len(faces)):
         all_vert = vertices[faces[face]]
         x0, y0, z0, w0 = all_vert[0]
         x1, y1, z1, w1 = all_vert[1]
         x2, y2, z2, w2 = all_vert[2]
+        if (x0 - x1) * (y0 - y2) - (y0 - y1) * (x0 - x2) > 0:
+            continue
         neg_points = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]).astype(float_bit)
         positive_points = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]).astype(float_bit)
         negative_counter = 0
@@ -134,11 +162,12 @@ def render_polygons(color_mat, depth_mat, vertices, faces, normals, face_colors)
             x1, y1 = (NEAR_PLANE - z0) / (z1 - z0) * (x1 - x0) + x0, (NEAR_PLANE - z0) / (z1 - z0) * (y1 - y0) + y0
             x2, y2 = (NEAR_PLANE - z0) / (z2 - z0) * (x2 - x0) + x0, (NEAR_PLANE - z0) / (z2 - z0) * (y2 - y0) + y0
             z1 = z2 = NEAR_PLANE
-            #x0, y0 = x0 / z0, y0 / z0
-            #x1, y1 = x1 / z1, y1 / z1
-            #x2, y2 = x2 / z2, y2 / z2
-            vert[0, 0], vert[0, 1], vert[0, 2], vert[1, 0], vert[1, 1], vert[1, 2], vert[2, 0], vert[2, 1], vert[2, 2] = x0, y0, z0, x1, y1, z1, x2, y2, z2
-            draw_face(color_mat, depth_mat, vert, normals[face], face_colors[face])
+            # x0, y0 = x0 / z0, y0 / z0
+            # x1, y1 = x1 / z1, y1 / z1
+            # x2, y2 = x2 / z2, y2 / z2
+            vert[0, 0], vert[0, 1], vert[0, 2], vert[1, 0], vert[1, 1], vert[1, 2], vert[2, 0], vert[2, 1], vert[
+                2, 2] = x0, y0, z0, x1, y1, z1, x2, y2, z2
+            draw_face(color_mat, depth_mat, priority_mat, vert, normals[face], face_colors[face])
 
         elif negative_counter == 1:
             x0, y0, z0, w0 = neg_points[0]
@@ -149,35 +178,37 @@ def render_polygons(color_mat, depth_mat, vertices, faces, normals, face_colors)
             x3, y3 = (NEAR_PLANE - z0) / (z1 - z0) * (x1 - x0) + x0, (NEAR_PLANE - z0) / (z1 - z0) * (y1 - y0) + y0
             x4, y4 = (NEAR_PLANE - z0) / (z2 - z0) * (x2 - x0) + x0, (NEAR_PLANE - z0) / (z2 - z0) * (y2 - y0) + y0
             z3 = z4 = NEAR_PLANE
-            #x1, y1 = x1 / z1, y1 / z1
-            #x2, y2 = x2 / z2, y2 / z2
-            #x3, y3 = x3 / z3, y3 / z3
-            #x4, y4 = x4 / z4, y4 / z4
+            # x1, y1 = x1 / z1, y1 / z1
+            # x2, y2 = x2 / z2, y2 / z2
+            # x3, y3 = x3 / z3, y3 / z3
+            # x4, y4 = x4 / z4, y4 / z4
 
-            vert[0, 0], vert[0, 1], vert[0, 2], vert[1, 0], vert[1, 1], vert[1, 2], vert[2, 0], vert[2, 1], vert[2, 2] = x1, y1, z1, x2, y2, z2, x3, y3, z3
-            draw_face(color_mat, depth_mat, vert, normals[face], face_colors[face])
-            vert[0, 0], vert[0, 1], vert[0, 2], vert[1, 0], vert[1, 1], vert[1, 2], vert[2, 0], vert[2, 1], vert[2, 2] = x2, y2, z2, x3, y3, z3, x4, y4, z4
-            draw_face(color_mat, depth_mat, vert, normals[face], face_colors[face])
+            vert[0, 0], vert[0, 1], vert[0, 2], vert[1, 0], vert[1, 1], vert[1, 2], vert[2, 0], vert[2, 1], vert[
+                2, 2] = x1, y1, z1, x2, y2, z2, x3, y3, z3
+            draw_face(color_mat, depth_mat, priority_mat, vert, normals[face], face_colors[face])
+            vert[0, 0], vert[0, 1], vert[0, 2], vert[1, 0], vert[1, 1], vert[1, 2], vert[2, 0], vert[2, 1], vert[
+                2, 2] = x2, y2, z2, x3, y3, z3, x4, y4, z4
+            draw_face(color_mat, depth_mat, priority_mat, vert, normals[face], face_colors[face])
         elif negative_counter == 0:
             x0, y0, z0, w0 = positive_points[0]
             x1, y1, z1, w1 = positive_points[1]
             x2, y2, z2, w2 = positive_points[2]
             z0, z1, z2 = w0, w1, w2
-            #x0, y0 = x0 / z0, y0 / z0
-            #x1, y1 = x1 / z1, y1 / z1
-            #x2, y2 = x2 / z2, y2 / z2
+            # x0, y0 = x0 / z0, y0 / z0
+            # x1, y1 = x1 / z1, y1 / z1
+            # x2, y2 = x2 / z2, y2 / z2
 
             vert[0, 0], vert[0, 1], vert[0, 2], vert[1, 0], vert[1, 1], vert[1, 2], vert[2, 0], vert[2, 1], vert[
                 2, 2] = x0, y0, z0, x1, y1, z1, x2, y2, z2
-            draw_face(color_mat, depth_mat, vert, normals[face], face_colors[face])
-
+            draw_face(color_mat, depth_mat, priority_mat, vert, normals[face], face_colors[face])
 
 
 @njit(fastmath=True)
-def draw_face(color_mat, depth_mat, vertices, g_normal, face_color):
+def draw_face(color_mat, depth_mat, priority_mat, vertices, g_normal, face_color):
     x0, y0, z0 = vertices[0]
     x1, y1, z1 = vertices[1]
     x2, y2, z2 = vertices[2]
+    cent = (z0 + z1 + z2) / 3
     x0, y0 = x0 / z0, y0 / z0
     x1, y1 = x1 / z1, y1 / z1
     x2, y2 = x2 / z2, y2 / z2
@@ -198,7 +229,8 @@ def draw_face(color_mat, depth_mat, vertices, g_normal, face_color):
     bbx_max = int(min(WIDTH - 1, max(max(xp0, xp1), xp2)))
     bby_min = int(max(0, min(min(yp0, yp1), yp2)))
     bby_max = int(min(HEIGHT - 1, max(max(yp0, yp1), yp2)))
-    lighting = (np.dot(g_normal, LIGHT_DIRECTION) / (np.linalg.norm(LIGHT_DIRECTION, ord=1) * np.linalg.norm(g_normal, ord=1)) + 1) / 2
+    lighting = (np.dot(g_normal, LIGHT_DIRECTION) / (
+            np.linalg.norm(LIGHT_DIRECTION, ord=1) * np.linalg.norm(g_normal, ord=1)) + 1) / 2
     r, g, b = face_color
     h, s, l = rgb_to_hsl(r, g, b)
     r, g, b = hsl_to_rgb(h, s, lighting ** 2)
@@ -208,16 +240,22 @@ def draw_face(color_mat, depth_mat, vertices, g_normal, face_color):
             xp = float(cx) * 2 / WIDTH - 1
             yp = 1 - float(cy) * 2 / HEIGHT
             dist = -(plane_a * xp + plane_b * yp - plane_d) / plane_c
-            if depth_mat[cx, cy] > dist or depth_mat[cx, cy] == 0.0:
-                full_triangle_area = abs(triangle_area(xp0, yp0, xp1, yp1, xp2, yp2))
-                area_sum = 0
-                area_sum += abs(triangle_area(xp0, yp0, xp1, yp1, cx, cy))
-                area_sum += abs(triangle_area(xp0, yp0, xp2, yp2, cx, cy))
-                area_sum += abs(triangle_area(xp1, yp1, xp2, yp2, cx, cy))
-                if area_sum + 0.01 > full_triangle_area > area_sum - 0.01:
-                    depth_mat[cx, cy] = dist
-                    color_mat[cx, cy, :] = [r, g, b]
-                    #color_mat[cx, cy, :] = [int(20*dist), int(20*dist), int(20*dist)]
+            if depth_mat[cx, cy] + jitter > dist > depth_mat[cx, cy] - jitter:
+                if priority_mat[cx, cy] < cent and priority_mat[cx, cy] != 0:
+                    continue
+            elif depth_mat[cx, cy] < dist and depth_mat[cx, cy] != 0:
+                continue
+            full_triangle_area = abs(triangle_area(xp0, yp0, xp1, yp1, xp2, yp2))
+            area_sum = 0
+            area_sum += abs(triangle_area(xp0, yp0, xp1, yp1, cx, cy))
+            area_sum += abs(triangle_area(xp0, yp0, xp2, yp2, cx, cy))
+            area_sum += abs(triangle_area(xp1, yp1, xp2, yp2, cx, cy))
+            color = np.array([r, g, b])
+            if area_sum + 0.01 > full_triangle_area > area_sum - 0.01:
+                set_pixel(color_mat, depth_mat, priority_mat, cx, cy, color, dist, cent)
+                # depth_mat[cx, cy] = dist
+                # color_mat[cx, cy, :] = [r, g, b]
+                # color_mat[cx, cy, :] = [int(20*dist), int(20*dist), int(20*dist)]
 
 
 @njit(fastmath=True)
@@ -294,29 +332,3 @@ def detect_not_drawn_vertices(vertices, md, not_drawn_vertices):
                 not_drawn_vertices[l] = v
                 l += 1
     return l
-
-
-@njit(fastmath=True)
-def render_func(vertices,
-                face_order,
-                color_faces,
-                faces,
-                face_normals,
-                face_centers,
-                not_drawn_vertices,
-                camera_position,
-                polygon_arr,
-                colors):
-    for i in range(len(face_order)):
-        index = face_order[i]
-        color = color_faces[index]
-        face = faces[index]
-        normal = face_normals[index]
-        corner = face_centers[index][:3]
-        # polygon = vertices[face]
-        if not (not_drawn_vertices.any() and overlap(face, not_drawn_vertices)):
-            if np.dot(normal, (camera_position[:3] - corner)) > 0:
-                lighting = (np.dot(normal, LIGHT_DIRECTION) /
-                            (np.linalg.norm(LIGHT_DIRECTION, ord=1) * np.linalg.norm(normal, ord=1)) + 1) / 2
-                polygon_arr[i, :] = vertices[face]
-                colors[i, :] = [*color[:2], int(100 * lighting ** 2), 100]

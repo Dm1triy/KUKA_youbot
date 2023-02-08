@@ -21,7 +21,7 @@ def fast_closest(target, src, out_ind, out_dist, n):
 
 def find_closest(target, src, n=1, /, dist_limit=None):
     target = target.astype(np.float32)
-    out_ind = np.zeros(n).astype(np.uint32)
+    out_ind = np.zeros(n).astype(np.int32)
     out_dist = np.zeros(n).astype(np.float32)
     out_dist[0] = np.linalg.norm(src[0] - target)
     fast_closest(target, src, out_ind, out_dist, n)
@@ -47,12 +47,13 @@ class RRT:
         self.nodes = np.array(start_point).astype(np.float32)
         self.node_num = 1
         map_shape = self.bool_map.shape
-        self.map_shape = (map_shape - np.ones(len(map_shape))).astype(np.uint32)
+        self.map_shape = (map_shape - np.ones(len(map_shape))).astype(np.int32)
         self.stuck = 0
         self.force_random = 0
         self.dist_reached = False
         self.end_node = -1
         self.path = []
+        self.path_ind = []
         self.graph_printed = False
 
         self.growth_factor = growth_factor
@@ -73,6 +74,8 @@ class RRT:
     def check_obstacle(self, point1, point2):
         shift_vector = (point2 - point1).astype(np.int32)
         iters = sum(abs(shift_vector))
+        if iters == 0:
+            return np.array(False), None, False
         shift_vector = shift_vector / iters
         all_shift = shift_vector
         c_point = np.array(False)
@@ -124,7 +127,7 @@ class RRT:
             _, dist, reached = self.check_obstacle(new_node, i[1])
             if reached:
                 if not have_parent:
-                    self.nodes = np.append(self.nodes, [new_node], axis=0).astype(np.uint32)
+                    self.nodes = np.append(self.nodes, [new_node], axis=0).astype(np.int32)
                     self.graph[self.node_num] = [i[0], [], dist + self.graph[i[0]][2]]
                     self.graph[i[0]][1].append(self.node_num)
                     self.node_num += 1
@@ -150,7 +153,7 @@ class RRT:
                 _, neighbors = find_closest(node, self.nodes, 10, dist_limit=self.growth_factor)
                 self.find_best_connection(node, neighbors)
             else:
-                self.nodes = np.append(self.nodes, [node], axis=0).astype(np.uint32)
+                self.nodes = np.append(self.nodes, [node], axis=0).astype(np.int32)
                 self.graph[self.node_num] = [closest_node[1], [], dist + self.graph[closest_node[1]][2]]
                 self.graph[closest_node[1]][1].append(self.node_num)
                 self.node_num += 1
@@ -160,7 +163,7 @@ class RRT:
             return np.array(False)
 
     def add_random(self):
-        random_point = (np.random.rand(len(self.map_shape)) * self.map_shape).astype(np.uint32)
+        random_point = (np.random.rand(len(self.map_shape)) * self.map_shape).astype(np.int32)
         self.random_point = random_point
         self.add_node_to_closest(random_point)
 
@@ -176,9 +179,12 @@ class RRT:
     def get_path(self):
         node_num = self.end_node
         self.path = []
+        self.path_ind = []
         while node_num:
             self.path.append(self.nodes[node_num])
+            self.path_ind.append(node_num)
             node_num = self.graph[node_num][0]
         self.path.append(self.nodes[node_num])
+        self.path_ind.append(node_num)
         if not self.graph_printed:
             self.graph_printed = True

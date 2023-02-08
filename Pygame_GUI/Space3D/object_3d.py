@@ -20,6 +20,25 @@ class Object3D:
             [x, y, z, 1]
         ]).astype(float_bit)
 
+        self.vertices = np.array(False)
+        self.vertex_colors = np.array(False)
+        self.vertex_radius = np.array(False)
+        self.draw_vertices = False
+
+        self.global_vert = np.array(False)
+        self.global_center_of_mass = np.array(False)
+        self.center_of_mass = np.array(False)
+
+        self.edges = np.array(False)
+        self.color_edges = np.array(False)
+        self.edges_thickness = np.array(False)
+        self.draw_edges = False
+
+        self.faces = np.array(False)
+        self.face_normals = np.array(False)
+        self.color_faces = np.array(False)
+        self.draw_faces = False
+
     def translate(self, pos):
         self.transform = self.transform @ translate(pos)
 
@@ -37,6 +56,34 @@ class Object3D:
 
     def position(self):
         return self.transform[:3, 3]
+
+
+    def vert_to_global(self):
+        self.global_vert = self.vertices @ self.transform
+        self.global_center_of_mass = self.center_of_mass @ self.transform
+
+    def draw(self, workspace):
+        vertices = self.global_vert @ self.render.camera.camera_matrix()
+        vertices = vertices @ self.render.projection.projection_matrix
+        if self.draw_vertices:
+            render_vertices(*workspace,
+                            vertices,
+                            self.vertex_colors,
+                            self.vertex_radius)
+        if self.draw_edges:
+            render_edges(*workspace,
+                         vertices,
+                         self.edges,
+                         self.color_edges,
+                         self.edges_thickness
+                         )
+        if self.draw_faces:
+            render_polygons(*workspace,
+                            vertices,
+                            self.faces,
+                            self.face_normals,
+                            self.color_faces
+                            )
 
 
 class Hollow3D(Object3D):
@@ -68,27 +115,9 @@ class Hollow3D(Object3D):
         self.color_edges = np.array([[255, 255, 255] for _ in self.edges]).astype(np.uint32)
 
         self.vert_to_global()
+        self.draw_vertices = True
+        self.draw_edges = True
 
-    def draw(self):
-        self.vert_to_global()
-        vertices = self.global_vert @ self.render.camera.camera_matrix()
-        vertices = vertices @ self.render.projection.projection_matrix
-        render_edges(self.render.color_mat,
-                     self.render.depth_mat,
-                     vertices,
-                     self.edges,
-                     self.color_edges,
-                     self.edges_thickness
-                     )
-        render_vertices(self.render.color_mat,
-                        self.render.depth_mat,
-                        vertices,
-                        self.vertex_colors,
-                        self.vertex_radius)
-
-    def vert_to_global(self):
-        self.global_vert = self.vertices @ self.transform
-        self.global_center_of_mass = self.center_of_mass @ self.transform
 
 
 class Solid3D(Object3D):
@@ -117,18 +146,8 @@ class Solid3D(Object3D):
 
         self.vert_to_global()
         self.global_vert = np.copy(self.vertices)
+        self.draw_faces = True
 
-    def draw(self):
-        self.vert_to_global()
-        vertices = self.global_vert @ self.render.camera.camera_matrix()
-        vertices = vertices @ self.render.projection.projection_matrix
-        render_polygons(self.render.color_mat,
-                        self.render.depth_mat,
-                        vertices,
-                        self.faces,
-                        self.face_normals,
-                        self.color_faces
-                        )
 
     def vert_to_global(self):
         self.global_vert = self.vertices @ self.transform

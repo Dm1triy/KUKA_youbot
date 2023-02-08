@@ -1,7 +1,7 @@
 import numpy as np
 import pygame as pg
 from Pygame_GUI.Space3D.matrix_functions import *
-from Pygame_GUI.Space3D.constants import *
+from Pygame_GUI.Space3D.pre_settings import *
 
 
 class Camera:
@@ -15,7 +15,7 @@ class Camera:
         self.v_fov = self.h_fov * (render.height / render.width)
         self.near_plane = NEAR_PLANE
         self.far_plane = FAR_PLANE
-        self.moving_speed = 0.3
+        self.moving_speed = 0.9
         self.zoom_speed = 3
         self.rotation_speed = 0.011
         self.mode = 1
@@ -36,7 +36,7 @@ class Camera:
         self.rotation = [0, 0]
         self.near_plane = NEAR_PLANE
         self.far_plane = FAR_PLANE
-        self.moving_speed = 0.3
+        self.moving_speed = 0.9
         self.zoom_speed = 3
         self.rotation_speed = 0.011
         self.direction = np.eye(4)
