@@ -1,9 +1,5 @@
-from numba import njit
-import os
-import inspect
+import numpy as np
 
-@njit(fastmath=True)
-def range_cut(mi, ma, num):
-    return min(max(num, mi), ma)
-
-print(range_cut)
+slicer = (slice(0, 4), slice(0, 4))
+a = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]])
+print(a[slicer[0], slicer[1]])

@@ -20,6 +20,7 @@ class Screen:
         self.mouse_delta = [0, 0]
         self.process_btn_clk = 0
         self.pressed_obj = None
+        self.released_obj = None
         self.old_mouse_pos = [0, 0]
         self.mouse_wheel_pos = 0
         self.mouse_pos = [0, 0]
@@ -90,6 +91,7 @@ class Screen:
                 self.pressed_obj = self.curr_obj
             elif event.type == pg.MOUSEBUTTONUP:
                 self.mouse_state = [event.button, 0]
+                self.released_obj = self.curr_obj
         self.mouse_delta = [self.old_mouse_pos[0] - self.mouse_pos[0], self.old_mouse_pos[1] - self.mouse_pos[1]]
         self.old_mouse_pos = self.mouse_pos[:]
 
@@ -102,6 +104,10 @@ class Screen:
             pomop = self.pressed_obj.convert_to_local(self.mouse_pos)
             self.pressed_obj.pressed(mouse_pos=pomop, btn_id=self.mouse_state[0])
             self.pressed_obj = None
+        if self.released_obj:
+            pomop = self.released_obj.convert_to_local(self.mouse_pos)
+            self.released_obj.release(mouse_pos=pomop, btn_id=self.mouse_state[0])
+            self.released_obj = None
         elif self.curr_obj:
             curr_obj_mouse_pos = self.curr_obj.convert_to_local(self.mouse_pos)
             if (self.mouse_delta[0] or self.mouse_delta[1]) and self.mouse_state[1]:

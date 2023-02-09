@@ -28,7 +28,7 @@ def find_closest(target, src, n=1, /, dist_limit=None):
     return [out_dist[:n], out_ind[:n]]
 
 
-class RRT:
+class Tree:
     def __init__(self, /,
                  start_point=None,
                  end_point=np.array(False),

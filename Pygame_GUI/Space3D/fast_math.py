@@ -123,8 +123,6 @@ def render_polygons(color_mat, depth_mat, priority_mat, vertices, faces, normals
         x0, y0, z0, w0 = all_vert[0]
         x1, y1, z1, w1 = all_vert[1]
         x2, y2, z2, w2 = all_vert[2]
-        if (x0 - x1) * (y0 - y2) - (y0 - y1) * (x0 - x2) > 0:
-            continue
         neg_points = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]).astype(float_bit)
         positive_points = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]).astype(float_bit)
         negative_counter = 0
@@ -233,7 +231,7 @@ def draw_face(color_mat, depth_mat, priority_mat, vertices, g_normal, face_color
             np.linalg.norm(LIGHT_DIRECTION, ord=1) * np.linalg.norm(g_normal, ord=1)) + 1) / 2
     r, g, b = face_color
     h, s, l = rgb_to_hsl(r, g, b)
-    r, g, b = hsl_to_rgb(h, s, lighting ** 2)
+    color = np.array(hsl_to_rgb(h, s, lighting ** 2))
 
     for cx in range(bbx_min, bbx_max):
         for cy in range(bby_min, bby_max):
@@ -250,12 +248,8 @@ def draw_face(color_mat, depth_mat, priority_mat, vertices, g_normal, face_color
             area_sum += abs(triangle_area(xp0, yp0, xp1, yp1, cx, cy))
             area_sum += abs(triangle_area(xp0, yp0, xp2, yp2, cx, cy))
             area_sum += abs(triangle_area(xp1, yp1, xp2, yp2, cx, cy))
-            color = np.array([r, g, b])
             if area_sum + 0.01 > full_triangle_area > area_sum - 0.01:
                 set_pixel(color_mat, depth_mat, priority_mat, cx, cy, color, dist, cent)
-                # depth_mat[cx, cy] = dist
-                # color_mat[cx, cy, :] = [r, g, b]
-                # color_mat[cx, cy, :] = [int(20*dist), int(20*dist), int(20*dist)]
 
 
 @njit(fastmath=True)

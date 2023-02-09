@@ -6,12 +6,16 @@ import time
 
 
 class Object3D:
-    def __init__(self, render, pos=None):
+    def __init__(self, render, /,
+                 vertices=None, vertex_radius=None, vertex_colors=None,
+                 edges=None, edges_thickness=None, color_edges=None,
+                 faces=None, color_faces=None,
+                 pos=None):
+
         if not pos:
             pos = [0, 0, 0]
         self.render = render
-        self.font = pg.font.SysFont('Arial', 30, bold=True)
-        self.label = ''
+
         x, y, z = pos
         self.transform = np.array([
             [1, 0, 0, 0],
@@ -20,24 +24,65 @@ class Object3D:
             [x, y, z, 1]
         ]).astype(float_bit)
 
-        self.vertices = np.array(False)
-        self.vertex_colors = np.array(False)
-        self.vertex_radius = np.array(False)
-        self.draw_vertices = False
-
         self.global_vert = np.array(False)
         self.global_center_of_mass = np.array(False)
-        self.center_of_mass = np.array(False)
 
-        self.edges = np.array(False)
-        self.color_edges = np.array(False)
-        self.edges_thickness = np.array(False)
-        self.draw_edges = False
+        self.draw_vertices = True
+        self.draw_edges = True
+        self.draw_faces = True
 
-        self.faces = np.array(False)
-        self.face_normals = np.array(False)
-        self.color_faces = np.array(False)
-        self.draw_faces = False
+        if not isinstance(vertices, np.ndarray):
+            vertices = np.array([np.array(v) for v in vertices]).astype(float_bit)
+        if vertices.any():
+            self.vertices = np.array([np.array(v).astype(float_bit) for v in vertices]).astype(float_bit)
+            if vertex_colors:
+                self.vertex_colors = np.array(vertex_colors).astype(np.int16)
+            else:
+                self.vertex_colors = np.array([[255, 255, 255] for _ in self.vertices]).astype(np.int32)
+            if vertex_radius:
+                self.vertex_radius = np.array(vertex_radius).astype(np.int16)
+            else:
+                self.vertex_radius = np.array([10] * len(self.vertices)).astype(np.int16)
+        else:
+            self.draw_vertices = False
+            self.draw_edges = False
+            self.draw_faces = False
+
+        if edges:
+            self.edges = np.array(edges).astype(np.uint32)
+            if edges_thickness:
+                self.edges_thickness = np.array(edges_thickness).astype(np.int16)
+            else:
+                self.edges_thickness = np.array([1] * len(self.edges)).astype(np.int16)
+
+            if color_edges:
+                self.color_edges = np.array(color_edges).astype(np.int32)
+            else:
+                self.color_edges = np.array([[255, 255, 255] for _ in self.edges]).astype(np.int32)
+        else:
+            self.draw_edges *= False
+
+        if faces:
+            faces_ = []
+            for face in faces:
+                for f_ in range(2, len(face)):
+                    faces_.append([face[f_ - 1], face[f_], face[0]])
+            self.faces = np.array(faces_).astype(np.uint32)
+            if color_faces:
+                self.color_faces = np.array(color_faces).astype(np.uint32)
+            else:
+                self.color_faces = np.array([[255, 255, 255] for _ in self.faces]).astype(np.uint32)
+            face_normals = []
+            for face in self.faces:
+                A = self.vertices[face[0]][:3] - self.vertices[face[-1]][:3]
+                B = self.vertices[face[0]][:3] - self.vertices[face[1]][:3]
+                face_normals.append(np.cross(B, A))
+            self.face_normals = np.array(face_normals).astype(float_bit)
+        else:
+            self.draw_faces *= False
+        self.global_vert = np.copy(self.vertices)
+        self.center_of_mass = np.mean(self.vertices, axis=0).astype(float_bit)
+        self.vert_to_global()
 
     def translate(self, pos):
         self.transform = self.transform @ translate(pos)
@@ -56,7 +101,6 @@ class Object3D:
 
     def position(self):
         return self.transform[:3, 3]
-
 
     def vert_to_global(self):
         self.global_vert = self.vertices @ self.transform
@@ -87,71 +131,15 @@ class Object3D:
 
 
 class Hollow3D(Object3D):
-    def __init__(self, render, vertices='', edges='', pos=None, /,
-                 edges_thickness=None,
-                 vertex_colors='',
-                 vertex_radius=''):
-        super().__init__(render, pos)
-        if vertices:
-            self.vertices = np.array([np.array(v).astype(float_bit) for v in vertices]).astype(float_bit)
-        if edges:
-            self.edges = np.array(edges).astype(np.uint32)
-        if edges_thickness:
-            self.edges_thickness = np.array(edges_thickness).astype(np.int16)
-        else:
-            self.edges_thickness = np.array([1] * len(self.edges)).astype(np.int16)
-        if vertex_colors:
-            self.vertex_colors = np.array(vertex_colors).astype(np.int16)
-        else:
-            self.vertex_colors = np.array([[255, 255, 255] for _ in self.vertices]).astype(np.uint32)
-        if vertex_radius:
-            self.vertex_radius = np.array(vertex_radius).astype(np.int16)
-        else:
-            self.vertex_radius = np.array([10] * len(self.vertices)).astype(np.int16)
-        self.center_of_mass = np.mean(self.vertices, axis=0).astype(float_bit)
-        self.font = pg.font.SysFont('Arial', 30, bold=True)
-        self.label = ''
-
-        self.color_edges = np.array([[255, 255, 255] for _ in self.edges]).astype(np.uint32)
-
-        self.vert_to_global()
-        self.draw_vertices = True
-        self.draw_edges = True
-
+    def __init__(self, render, vertices='', edges='',  **kwargs):
+        super().__init__(render, vertices=vertices, edges=edges, **kwargs)
 
 
 class Solid3D(Object3D):
-    def __init__(self, render, vertices='', faces='', pos=None):
-        super().__init__(render, pos)
-        if vertices:
-            self.vertices = np.array([np.array(v) for v in vertices]).astype(float_bit)
-        if faces:
-            faces_ = []
-            for face in faces:
-                for f_ in range(2, len(face)):
-                    faces_.append([face[f_ - 1], face[f_], face[0]])
-            self.faces = np.array(faces_).astype(np.uint32)
-        self.center_of_mass = np.mean(self.vertices, axis=0).astype(float_bit)
-        self.font = pg.font.SysFont('Arial', 30, bold=True)
-        self.color_faces = np.array([[255, 255, 255] for _ in self.faces]).astype(np.uint32)
-        self.label = ''
-
-        # calculate face normals and centers
-        face_normals = []
-        for face in self.faces:
-            A = self.vertices[face[0]][:3] - self.vertices[face[-1]][:3]
-            B = self.vertices[face[0]][:3] - self.vertices[face[1]][:3]
-            face_normals.append(np.cross(B, A))
-        self.face_normals = np.array(face_normals).astype(float_bit)
-
-        self.vert_to_global()
-        self.global_vert = np.copy(self.vertices)
-        self.draw_faces = True
-
-
-    def vert_to_global(self):
-        self.global_vert = self.vertices @ self.transform
-        self.global_center_of_mass = self.center_of_mass @ self.transform
+    def __init__(self, render, vertices='', faces='',  **kwargs):
+        super().__init__(render, vertices=vertices, faces=faces, **kwargs)
+        self.draw_vertices = False
+        self.draw_edges = False
 
 
 class Axes(Hollow3D):

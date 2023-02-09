@@ -50,6 +50,9 @@ class Sprite:
     def dragged(self, *args, **kwargs):
         pass
 
+    def release(self, *args, **kwargs):
+        pass
+
     def hover(self, *args, **kwargs):
         pass
 
@@ -64,14 +67,15 @@ class Sprite:
 
 
 class Button(Sprite):
-    def __init__(self, par_surf, /, **kwargs):
+    def __init__(self, par_surf, /, radius=10, **kwargs):
         super().__init__(par_surf, **kwargs)
+        self.radius = radius
 
     def pressed(self, *args, **kwargs):
         self.func(*args, **kwargs)
 
     def draw(self):
-        pg.draw.rect(self.surface, self.color, self.rect)
+        pg.draw.rect(self.surface, self.color, self.rect, border_radius=self.radius)
 
 
 class Text(Sprite):
@@ -130,8 +134,9 @@ class Slider(Sprite):
 
     def draw(self):
         self.slider_x = convert_range(self.slider_rad, self.width - self.slider_rad, self.min, self.max, self.val)
-        pg.draw.rect(self.surface, self.color, (self.x, self.y, self.width, self.height), border_radius=self.height // 2)
-        pg.draw.circle(self.surface, (255, 255, 255), (self.x+self.slider_x, self.y+self.slider_y), self.slider_rad)
+        pg.draw.rect(self.surface, self.color, (self.x, self.y, self.width, self.height),
+                     border_radius=self.height // 2)
+        pg.draw.circle(self.surface, (255, 255, 255), (self.x + self.slider_x, self.y + self.slider_y), self.slider_rad)
 
 
 class Mat(Sprite):

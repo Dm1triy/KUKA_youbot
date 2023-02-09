@@ -282,6 +282,8 @@ class KUKA:
             password = "112233"
         elif self.ip[-1] == "5":
             password = "111111"
+        elif self.ip[-1] == "2":
+            password = "111111"
         try:
             self.ssh_client.connect(hostname=self.ip, username=user, password=password, port=port)
         except Exception as err:
@@ -534,12 +536,12 @@ class KUKA:
         :return: None
         '''
         self.threads_number += 1
-        while not (self.wheels_data_lidar and self.lidar):
+        while not (self.increment_data_lidar and self.lidar):
             time.sleep(0.2)
         debug(f"writing log to {path} with 1/{freq}Hz")
         self.log_file = open(path, "a")
         while self.main_thr.is_alive():
-            self.log_file.write(", ".join(map(str, self.wheels_data_lidar)) + "; " + ", ".join(map(str, self.lidar[-1])) + "\n")
+            self.log_file.write(", ".join(map(str, self.increment_data_lidar)) + "; " + ", ".join(map(str, self.lidar[-1])) + "\n")
             time.sleep(1 / freq)
         self.log_file.close()
         self.threads_number -= 1
