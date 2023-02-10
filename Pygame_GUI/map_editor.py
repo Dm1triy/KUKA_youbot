@@ -69,14 +69,16 @@ class MapEditor(Sprite):
                     self.full_map[x, y, self.time_range[0]:self.time_range[1]] = self.point_ind
                     self.points[self.point_ind] = [x, y, self.time_range]
                     self.point_ind += 1
+                    self.end_point = [x, y, self.time_range]
                 else:
                     self.full_map[x, y, self.time_range[0]:self.time_range[1]] = 1
             else:
                 print("no")
         else:
             to_del_ind = self.full_map[x, y, self.curr_time]
-
-            if to_del_ind and to_del_ind != 2:
+            if to_del_ind == 1:
+                self.full_map[x, y, self.time_range[0]:self.time_range[1]] = 0
+            elif to_del_ind and to_del_ind != 2:
                 to_del_param = self.points[to_del_ind]
                 del self.points[to_del_ind]
                 self.full_map[to_del_param[0], to_del_param[1], to_del_param[2][0]:to_del_param[2][1]] = 0

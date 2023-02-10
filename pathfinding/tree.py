@@ -5,8 +5,16 @@ from numba import njit
 
 
 @njit(fastmath=True)
-def fast_closest(target, src, out_ind, out_dist, n):
+def fast_closest(target, src, out_ind, out_dist, n, remove_target):
+
     for p in range(1, len(src)):
+        is_target = False
+        for rm_t in remove_target:
+            if p == rm_t:
+                is_target = True
+                break
+        if is_target:
+            continue
         point = src[p]
         dist = np.linalg.norm(point - target)
         for i in range(n):
@@ -19,33 +27,62 @@ def fast_closest(target, src, out_ind, out_dist, n):
                 break
 
 
-def find_closest(target, src, n=1, /, dist_limit=None):
+def find_closest(target, src, n=1, /, dist_limit=None, remove_target=(-1, -1)):
+    remove_target = np.array(remove_target).astype(np.int32)
     target = target.astype(np.float32)
     out_ind = np.zeros(n).astype(np.int32)
     out_dist = np.zeros(n).astype(np.float32)
     out_dist[0] = np.linalg.norm(src[0] - target)
-    fast_closest(target, src, out_ind, out_dist, n)
+    fast_closest(target, src, out_ind, out_dist, n, remove_target)
     return [out_dist[:n], out_ind[:n]]
 
 
 class Tree:
     def __init__(self, /,
                  start_point=None,
+                 start_point_available=None,
                  end_point=np.array(False),
                  bin_map=None,
-                 growth_factor=20,
+                 growth_factor=5,
                  e=0.04,
-                 end_dist=25,
-                 rrt_star_rad=20):
+                 end_dist=6,
+                 rrt_star_rad=5):
         self.end_point = end_point
         self.bool_map = bin_map
 
         self.star = True
+        if not start_point_available:
+            start_point_available = [True]*len(start_point)
 
+        # start points
         self.graph = dict()
         self.graph[0] = [None, [], 0]
-        self.nodes = np.array(start_point).astype(np.float32)
+        self.nodes = np.array([start_point[0]]).astype(np.float32)
         self.node_num = 1
+        for i in range(1, len(start_point_available)):
+            if start_point_available[i]:
+                self.graph[i] = [i - 1, [], 0]
+            else:
+                self.graph[i] = [i - 1, [], -1]
+            self.graph[i - 1][1].append(i)
+            self.nodes = np.append(self.nodes, [start_point[i]], axis=0).astype(np.int32)
+            self.node_num += 1
+
+
+        # end points
+        self.target_ind = []
+        self.graph[self.node_num] = [None, [], float("inf")]
+        self.nodes = np.append(self.nodes, [end_point[0]], axis=0).astype(np.int32)
+        self.target_ind.append(self.node_num)
+        self.node_num += 1
+        for i in range(0, len(end_point)):
+            nn = self.node_num
+            self.graph[nn] = [nn-1, [], float("inf")]
+            self.graph[nn-1][1].append(nn)
+            self.nodes = np.append(self.nodes, [end_point[i]], axis=0).astype(np.int32)
+            self.target_ind.append(self.node_num)
+            self.node_num += 1
+
         map_shape = self.bool_map.shape
         self.map_shape = (map_shape - np.ones(len(map_shape))).astype(np.int32)
         self.stuck = 0
@@ -72,8 +109,8 @@ class Tree:
         assert bin_map.any()
 
     def check_obstacle(self, point1, point2):
-        shift_vector = (point2 - point1).astype(np.int32)
-        iters = sum(abs(shift_vector))*2
+        shift_vector = (point2.astype(np.float32) - point1.astype(np.float32)).astype(np.float32)
+        iters = int(sum(abs(shift_vector))*2)
         if iters == 0:
             return np.array(False), None, False
         shift_vector = shift_vector / iters
@@ -124,21 +161,29 @@ class Tree:
         neighbours.sort(key=lambda x: x[-1], reverse=False)
         have_parent = False
         for i in neighbours:
-            _, dist, reached = self.check_obstacle(new_node, i[1])
+            neighbour_id, neighbour_node, neighbour_parent, neighbour_children, neighbour_dist_to_orig = i
+            if neighbour_dist_to_orig == -1:
+                continue
+            _, dist, reached = self.check_obstacle(new_node, neighbour_node)
             if reached:
                 if not have_parent:
                     self.nodes = np.append(self.nodes, [new_node], axis=0).astype(np.int32)
-                    self.graph[self.node_num] = [i[0], [], dist + self.graph[i[0]][2]]
-                    self.graph[i[0]][1].append(self.node_num)
+                    self.graph[self.node_num] = [neighbour_id, [], dist + neighbour_dist_to_orig]
+                    self.graph[neighbour_id][1].append(self.node_num)
                     self.node_num += 1
                     have_parent = True
                 else:
-                    if dist + self.graph[self.node_num - 1][2] < self.graph[i[0]][2]:
-                        if i[0] in self.graph[i[2]][1]:
-                            self.graph[i[0]][0] = self.node_num - 1
-                            self.graph[i[2]][1].remove(i[0])
-                            self.graph[self.node_num - 1][1].append(i[0])
-                            self.rebalance(i[0], self.graph[i[0]][2] - dist - self.graph[self.node_num - 1][2])
+                    if dist + self.graph[self.node_num - 1][2] < neighbour_dist_to_orig:
+                        if neighbour_id in self.graph[neighbour_parent][1]:
+                            self.graph[neighbour_id][0] = self.node_num - 1
+                            self.graph[neighbour_parent][1].remove(neighbour_id)
+                            self.graph[self.node_num - 1][1].append(neighbour_id)
+                            self.rebalance(neighbour_id, self.graph[neighbour_id][2] - dist - self.graph[self.node_num - 1][2])
+                            if neighbour_id in self.target_ind:
+
+                                self.target_ind.remove(neighbour_id)
+                                self.dist_reached = True
+                                self.end_node = self.node_num-1
 
     def rebalance(self, node_num, delta):
         self.graph[node_num][2] -= delta
@@ -146,21 +191,13 @@ class Tree:
             self.rebalance(i, delta)
 
     def add_node_to_closest(self, new_node):
-        _, closest_node = find_closest(new_node, self.nodes)
-        node, dist, _ = self.check_obstacle(self.nodes[closest_node[0]], new_node)
+        _, closest_node = find_closest(new_node, self.nodes, remove_target=self.target_ind)
+        node, dist, reached = self.check_obstacle(self.nodes[closest_node[0]], new_node)
         if node.any():
-            if self.star:
-                _, neighbors = find_closest(node, self.nodes, 10, dist_limit=self.growth_factor)
-                self.find_best_connection(node, neighbors)
-            else:
-                self.nodes = np.append(self.nodes, [node], axis=0).astype(np.int32)
-                self.graph[self.node_num] = [closest_node[1], [], dist + self.graph[closest_node[1]][2]]
-                self.graph[closest_node[1]][1].append(self.node_num)
-                self.node_num += 1
+            _, neighbors = find_closest(node, self.nodes, 10, dist_limit=self.growth_factor)
+            self.find_best_connection(node, neighbors)
 
-            return node
-        else:
-            return np.array(False)
+        return reached
 
     def add_random(self):
         random_point = (np.random.rand(len(self.map_shape)) * self.map_shape).astype(np.int32)
@@ -168,8 +205,8 @@ class Tree:
         self.add_node_to_closest(random_point)
 
     def add_near_end(self):
-        node = self.add_node_to_closest(self.end_point)
-        if node.any() and node[0] == self.end_point[0] and node[1] == self.end_point[1]:
+        reached = self.add_node_to_closest(self.end_point)
+        if reached:
             print("done")
             self.dist_reached = True
             self.end_node = self.node_num - 1

@@ -31,6 +31,8 @@ class Object3D:
         self.draw_edges = True
         self.draw_faces = True
 
+        self.empty = True
+
         if not isinstance(vertices, np.ndarray):
             vertices = np.array([np.array(v) for v in vertices]).astype(float_bit)
         if vertices.any():
@@ -43,6 +45,10 @@ class Object3D:
                 self.vertex_radius = np.array(vertex_radius).astype(np.int16)
             else:
                 self.vertex_radius = np.array([10] * len(self.vertices)).astype(np.int16)
+
+            self.global_vert = np.copy(self.vertices)
+            self.center_of_mass = np.mean(self.vertices, axis=0).astype(float_bit)
+            self.empty = False
         else:
             self.draw_vertices = False
             self.draw_edges = False
@@ -60,7 +66,7 @@ class Object3D:
             else:
                 self.color_edges = np.array([[255, 255, 255] for _ in self.edges]).astype(np.int32)
         else:
-            self.draw_edges *= False
+            self.draw_edges = False
 
         if faces:
             faces_ = []
@@ -79,10 +85,9 @@ class Object3D:
                 face_normals.append(np.cross(B, A))
             self.face_normals = np.array(face_normals).astype(float_bit)
         else:
-            self.draw_faces *= False
-        self.global_vert = np.copy(self.vertices)
-        self.center_of_mass = np.mean(self.vertices, axis=0).astype(float_bit)
-        self.vert_to_global()
+            self.draw_faces = False
+
+
 
     def translate(self, pos):
         self.transform = self.transform @ translate(pos)
@@ -103,10 +108,13 @@ class Object3D:
         return self.transform[:3, 3]
 
     def vert_to_global(self):
-        self.global_vert = self.vertices @ self.transform
-        self.global_center_of_mass = self.center_of_mass @ self.transform
+        if not self.empty:
+            self.global_vert = self.vertices @ self.transform
+            self.global_center_of_mass = self.center_of_mass @ self.transform
 
     def draw(self, workspace):
+        if self.empty:
+            return
         vertices = self.global_vert @ self.render.camera.camera_matrix()
         vertices = vertices @ self.render.projection.projection_matrix
         if self.draw_vertices:
