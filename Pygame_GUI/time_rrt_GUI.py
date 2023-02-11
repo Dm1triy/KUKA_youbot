@@ -1,10 +1,8 @@
-import numpy as np
-
 from Pygame_GUI.Screen import Screen
 from Pygame_GUI.Space3D.Space3D import Space3D
 from Pygame_GUI.Space3D.object_3d import *
 from Pygame_GUI.Objects import *
-from pathfinding.tree import Tree
+from pathfinding.time_rrt.new_tree import Tree
 import time
 from Pygame_GUI.map_editor import MapEditor
 
@@ -156,16 +154,18 @@ class TimeRrtGui:
             if self.tree_running:
                 self.tree.step()
                 if self.enable_3d:
+                    print("draw_tree begin")
                     self.draw_tree()
+                    print("draw_tree end")
 
     def draw_tree(self):
         nodes = []
-        for j in range(self.tree.nodes.shape[0]):
-            nodes.append(np.array([*self.tree.nodes[j], 1]).astype(float_bit))
+        for j in range(self.tree.graph.nodes.shape[0]):
+            nodes.append(np.array([*self.tree.graph.nodes[j], 1]).astype(float_bit))
         edges = []
         path_len = 1
-        for i in range(1, self.tree.node_num):
-            n = self.tree.graph[i][0]
+        for i in range(1, self.tree.graph.node_num):
+            n = self.tree.graph[i].parent
             if n:
                 edges.append(np.array([i, n]).astype(np.int32))
         if self.tree.dist_reached:

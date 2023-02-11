@@ -37,15 +37,16 @@ def render_vertices(color_mat, depth_mat, priority_mat, vertices, vertex_colors,
             continue
         rad = vertex_radius[vertex]
         dist = z0
-        if depth_mat[xp0, yp0] + jitter > dist > depth_mat[xp0, yp0] - jitter:
-            if priority_mat[xp0, yp0] < dist and priority_mat[xp0, yp0] != 0:
-                continue
-        elif depth_mat[xp0, yp0] < dist and depth_mat[xp0, yp0] != 0:
-            continue
+
         for dx in range(-rad, rad):
             for dy in range(-rad, rad):
                 cx, cy = xp0 + dx, yp0 + dy
                 if 0 <= cx < WIDTH and 0 <= cy < HEIGHT and dx ** 2 + dy ** 2 < rad ** 2:
+                    if depth_mat[cx, cy] + jitter > dist > depth_mat[cx, cy] - jitter:
+                        if priority_mat[cx, cy] < dist and priority_mat[cx, cy] != 0:
+                            continue
+                    elif depth_mat[cx, cy] < dist and depth_mat[cx, cy] != 0:
+                        continue
                     set_pixel(color_mat, depth_mat, priority_mat, cx, cy, vertex_colors[vertex], z0, z0)
                     # color_mat[cx, cy, :] = vertex_colors[vertex]
                     # depth_mat[cx, cy] = z0

@@ -16,7 +16,7 @@ class MapEditor(Sprite):
         self.bin_map = np.zeros(self.map_shape).astype(np.uint8)
         self.time_range = [0, self.map_shape[-1]]
         self.curr_time = 0
-        self.set_mode = 0
+        self.set_mode = 1
         self.origin = [1, 1, [0, 99]]
         self.end_point = [29, 29, [0, 99]]
         self.full_map = np.zeros(self.map_shape).astype(np.uint16)
@@ -84,7 +84,7 @@ class MapEditor(Sprite):
                 self.full_map[to_del_param[0], to_del_param[1], to_del_param[2][0]:to_del_param[2][1]] = 0
 
     def dragged(self, *args, **kwargs):
-        if self.set_mode != 0:
+        if self.set_mode != 1:
             return
         setter = 0
         if kwargs["btn_id"] == 1:
