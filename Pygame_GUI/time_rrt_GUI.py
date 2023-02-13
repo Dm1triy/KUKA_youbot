@@ -42,6 +42,8 @@ class TimeRrtGui:
                            func=self.map_editor.set_mode_wall)
         self.screen.sprite(Button, "run_rrt", x=0.38, y=0.82, width=0.06, height=0.04, color=(255, 0, 255),
                            func=self.run_rrt)
+        self.screen.sprite(Button, "disable_3d", x=0.45, y=0.82, width=0.06, height=0.04, color=(255, 0, 255),
+                           func=self.disable_3d)
         self.screen.sprite(Text, "input_TTL_label", x=0.03, y=0.86, inp_text=lambda: "input_TTL", font='serif',
                            font_size=10)
         self.screen.sprite(Text, "export_3d_label", x=0.1, y=0.86, inp_text=lambda: "export_3d", font='serif',
@@ -53,6 +55,8 @@ class TimeRrtGui:
         self.screen.sprite(Text, "set_wall_label", x=0.31, y=0.86, inp_text=lambda: "set_wall", font='serif',
                            font_size=10)
         self.screen.sprite(Text, "run_rrt_label", x=0.38, y=0.86, inp_text=lambda: "run_rrt", font='serif',
+                           font_size=10)
+        self.screen.sprite(Text, "disable_3d_label", x=0.45, y=0.86, inp_text=lambda: "disable_3d", font='serif',
                            font_size=10)
         self.screen.sprite(Slider, "curr_time", min=0, max=self.map_shape[-1] - 1, x=0.03, y=0.91,
                            width=0.47, height=0.05, color=(150, 160, 170),
@@ -126,7 +130,8 @@ class TimeRrtGui:
         map3d = Solid3D(self.space_3d, vertices, edges, pos=(-16.5, -16.5, -51.5))
         self.space_3d.add_object(map3d)
         self.map3d.draw_faces = True
-
+    def disable_3d(self, *args, **kwargs):
+        self.space_3d.enable = not self.space_3d.enable
     def run_rrt(self, *args, **kwargs):
         origin = self.map_editor.origin
         start_point = [[origin[0], origin[1], i] for i in range(origin[2][0], origin[2][1])]
@@ -150,14 +155,16 @@ class TimeRrtGui:
 
     def run(self):
         i=0
+        t = time.time()
         while self.screen.running:
             self.screen.step()
             if self.tree_running:
                 self.tree.step()
                 i+=1
                 if i % 100 == 0:
-                    print(i)
-                if self.enable_3d:
+                    print(i, time.time()-t)
+                    t = time.time()
+                if self.enable_3d and self.space_3d.enable:
                     self.draw_tree()
 
     def draw_tree(self):

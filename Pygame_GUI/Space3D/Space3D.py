@@ -22,6 +22,7 @@ class Space3D(Sprite):
 
         self.last_drag_pos = (0, 0)
         self.last_mouse_wheel = 0
+        self.enable = True
 
         self.mouse_sense = 0.1
         self.old_pressed_keys = []
@@ -49,15 +50,16 @@ class Space3D(Sprite):
                           np.zeros((WIDTH, HEIGHT), dtype=float_bit))  # priority
 
     def draw(self):
-        self.clear_workspace()
-        for i in self.all_obj:
-            i.vert_to_global()
-        self.all_obj = sorted(self.all_obj, key=lambda x:np.linalg.norm(x.global_center_of_mass), reverse=True)
-        for i in self.all_obj:
-            i.draw(self.workspace)
-        # maybe blit_array
-        self.rect = self.surface.blit(
-            pg.transform.scale(pg.surfarray.make_surface(self.workspace[0]), (self.width, self.height)), self.pos)
+        if self.enable:
+            self.clear_workspace()
+            for i in self.all_obj:
+                i.vert_to_global()
+            self.all_obj = sorted(self.all_obj, key=lambda x:np.linalg.norm(x.global_center_of_mass), reverse=True)
+            for i in self.all_obj:
+                i.draw(self.workspace)
+            # maybe blit_array
+            self.rect = self.surface.blit(
+                pg.transform.scale(pg.surfarray.make_surface(self.workspace[0]), (self.width, self.height)), self.pos)
 
     def add_object(self, obj):
         self.all_obj.append(obj)

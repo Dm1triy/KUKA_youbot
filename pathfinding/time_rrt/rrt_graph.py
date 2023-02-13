@@ -16,22 +16,27 @@ class Graph:
         self.nodes = np.array([start_point[0]]).astype(np.float32)
         self.node_num = 1
         self.earliest_endpoint_ind = -1
-
+        self.blocked_nodes = []
+        self.origin_ind = []
         for i in range(1, len(start_point_available)):
             if start_point_available[i]:
                 rank = ORIGIN
             else:
                 rank = ORIGIN_BLOCKED
+                self.blocked_nodes.append(i)
+            self.origin_ind.append(i)
             self.add_node(i - 1, start_point[i], [], rank)
 
         if end_point.any():
             # end points
-            self.target_ind = []
-            self.target_ind.append(self.node_num)
+            self.endpoint_ind = []
+            self.blocked_nodes = []
+            self.endpoint_ind.append(self.node_num)
             self.add_node(None, end_point[0], [], ENDPOINT_BLOCKED)
             for i in range(0, len(end_point)):
-                self.target_ind.append(self.node_num)
+                self.endpoint_ind.append(self.node_num)
                 self.add_node(self.node_num - 1, end_point[i], [], ENDPOINT_BLOCKED)
+            self.blocked_nodes += self.endpoint_ind
 
     def __str__(self):
         out_str = "Graph:\n"
@@ -83,12 +88,26 @@ class Graph:
                 self.earliest_endpoint_ind = endpoint.index
         else:
             self.earliest_endpoint_ind = endpoint.index
-        for i in range(len(self.target_ind)-1, -1):
-            endpoint_node = self.graph[self.target_ind[i]]
-            prev_endpoint_node = self.graph[self.target_ind[i-1]]
+        for i in range(len(self.endpoint_ind)-1, -1):
+            endpoint_node = self.graph[self.endpoint_ind[i]]
+            prev_endpoint_node = self.graph[self.endpoint_ind[i-1]]
             endpoint_node.parent.del_child(self)
             endpoint_node.parent = prev_endpoint_node
             prev_endpoint_node.add_child(endpoint_node)
             endpoint_node.dist_to_parent = np.linalg.norm(prev_endpoint_node.pos - endpoint_node.pos)
             endpoint_node.dist_to_origin = prev_endpoint_node.parent.dist_to_origin + endpoint_node.dist_to_parent
 
+    def unblock_end(self, ind):
+        for i in self.endpoint_ind:
+            if i > ind:
+                self.graph[i].rank = ENDPOINT
+                if ind in self.blocked_nodes:
+                    self.blocked_nodes.remove(ind)
+
+
+    def unblock_origin(self, ind):
+        for i in self.origin_ind:
+            if i > ind:
+                self.graph[i].rank = ENDPOINT
+                if ind in self.blocked_nodes:
+                    self.blocked_nodes.remove(ind)

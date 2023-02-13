@@ -52,7 +52,7 @@ class Tree:
             print("No bin_map")
         assert bin_map.any()
 
-    def check_obstacle(self, point1, point2):
+    def check_obstacle_old(self, point1, point2):
         shift_vector = (point2.astype(np.float32) - point1.astype(np.float32)).astype(np.float32)
         transition = np.linalg.norm(shift_vector[:self.time_dimension])
         time = shift_vector[self.time_dimension]
@@ -87,6 +87,14 @@ class Tree:
         else:
             return np.array(False), None, False
 
+    def check_obstacle(self, point1, point2):
+        info = np.zeros(len(point1)+2).astype(np.float32)
+        check_obstacle(point1, point2, self.bool_map, self.growth_factor, self.e, self.min_speed, self.max_speed, info)
+        node, dist, reached = info[:3], info[3], info[4]
+        node = node.astype(np.int32)
+        reached = bool(reached)
+        return node, dist, reached
+
     def step(self):
         self.add_random()
 
@@ -103,7 +111,7 @@ class Tree:
                 _, dist, reached = self.check_obstacle(new_node_pos, neighbour.pos)
             if reached:
                 if not have_parent:
-                    if neighbour.rank != ENDPOINT_BLOCKED:
+                    if neighbour.rank not in [ENDPOINT_BLOCKED, ENDPOINT, ORIGIN_BLOCKED]:
                         new_node = self.graph.add_node(neighbour, new_node_pos)
                         have_parent = True
                 else:
@@ -113,12 +121,12 @@ class Tree:
                             if neighbour.rank == ENDPOINT_BLOCKED:
                                 neighbour.rank = ENDPOINT
                                 self.graph.update_endpoints(neighbour)
-                                self.graph.target_ind.remove(neighbour.index)
+                                self.graph.unblock_end(neighbour.index)
                                 self.dist_reached = True
                                 self.end_node = neighbour.index
 
     def add_node_to_closest(self, new_node_pos):
-        _, closest_node = find_closest(new_node_pos, self.graph.nodes, 10, remove_target=self.graph.target_ind)
+        _, closest_node = find_closest(new_node_pos, self.graph.nodes, 10, remove_target=self.graph.blocked_nodes)
         for i in range(10):
             found_node_pos, dist, reached = self.check_obstacle(self.graph.nodes[closest_node[i]], new_node_pos)
             if dist:
@@ -128,7 +136,7 @@ class Tree:
 
 
     def add_node_to_closest_with_speed(self, new_node_pos):
-        _, closest_node_ind = find_closest(new_node_pos, self.graph.nodes, remove_target=self.graph.target_ind)
+        _, closest_node_ind = find_closest(new_node_pos, self.graph.nodes, remove_target=self.graph.blocked_nodes)
         alph, th = np.random.random(2)
         alph = alph*2*math.pi
         th = self.min_speed_ang + th * (self.max_speed_ang-self.min_speed_ang)
