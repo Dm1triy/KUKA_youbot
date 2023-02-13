@@ -1,3 +1,6 @@
+import random
+import math
+
 from pathfinding.time_rrt.fast_math import *
 from pathfinding.time_rrt.rrt_graph import *
 
@@ -15,6 +18,13 @@ class Tree:
         self.end_point = end_point
         self.bool_map = bin_map
         self.star = True
+        # speed in space discretes per time discretes
+        self.min_speed = 0
+        self.max_speed = 3
+        self.min_speed_ang = math.atan(self.min_speed)
+        self.max_speed_ang = math.atan(self.max_speed)
+        self.time_dimension = 2
+
         self.graph = Graph(start_point=start_point, start_point_available=start_point_available, end_point=end_point)
 
         map_shape = self.bool_map.shape
@@ -44,6 +54,12 @@ class Tree:
 
     def check_obstacle(self, point1, point2):
         shift_vector = (point2.astype(np.float32) - point1.astype(np.float32)).astype(np.float32)
+        transition = np.linalg.norm(shift_vector[:self.time_dimension])
+        time = shift_vector[self.time_dimension]
+        if time <= 0:
+            return np.array(False), None, False
+        if not self.min_speed <= transition/time <= self.max_speed:
+            return np.array(False), None, False
         iters = int(sum(abs(shift_vector)) * 2)
         if iters == 0:
             return np.array(False), None, False
@@ -81,7 +97,10 @@ class Tree:
         for neighbour in neighbours:
             if neighbour.rank == ORIGIN_BLOCKED:
                 continue
-            _, dist, reached = self.check_obstacle(new_node_pos, neighbour.pos)
+            if not have_parent:
+                _, dist, reached = self.check_obstacle(neighbour.pos, new_node_pos)
+            else:
+                _, dist, reached = self.check_obstacle(new_node_pos, neighbour.pos)
             if reached:
                 if not have_parent:
                     if neighbour.rank != ENDPOINT_BLOCKED:
@@ -93,30 +112,49 @@ class Tree:
                             neighbour.new_parent(new_node)
                             if neighbour.rank == ENDPOINT_BLOCKED:
                                 neighbour.rank = ENDPOINT
+                                self.graph.update_endpoints(neighbour)
                                 self.graph.target_ind.remove(neighbour.index)
                                 self.dist_reached = True
                                 self.end_node = neighbour.index
 
     def add_node_to_closest(self, new_node_pos):
-        _, closest_node = find_closest(new_node_pos, self.graph.nodes, remove_target=self.graph.target_ind)
-        new_node_pos, dist, reached = self.check_obstacle(self.graph.nodes[closest_node[0]], new_node_pos)
-        if new_node_pos.any():
-            _, neighbors = find_closest(new_node_pos, self.graph.nodes, 10, dist_limit=self.growth_factor)
-            self.find_best_connection(new_node_pos, neighbors)
-        return reached
+        _, closest_node = find_closest(new_node_pos, self.graph.nodes, 10, remove_target=self.graph.target_ind)
+        for i in range(10):
+            found_node_pos, dist, reached = self.check_obstacle(self.graph.nodes[closest_node[i]], new_node_pos)
+            if dist:
+                break
+        _, neighbors = find_closest(found_node_pos, self.graph.nodes, 10, dist_limit=self.growth_factor)
+        self.find_best_connection(found_node_pos, neighbors)
 
+
+    def add_node_to_closest_with_speed(self, new_node_pos):
+        _, closest_node_ind = find_closest(new_node_pos, self.graph.nodes, remove_target=self.graph.target_ind)
+        alph, th = np.random.random(2)
+        alph = alph*2*math.pi
+        th = self.min_speed_ang + th * (self.max_speed_ang-self.min_speed_ang)
+        z = self.growth_factor*math.sin(th)
+        lo = self.growth_factor*math.cos(th)
+        x = lo*math.sin(alph)
+        y = lo*math.cos(alph)
+        closest_node = self.graph.nodes[closest_node_ind[0]]
+        new_node_pos = closest_node + np.array([x, y, z]).astype(int)
+        found_node_pos, dist, reached = self.check_obstacle(self.graph.nodes[closest_node_ind[0]], new_node_pos)
+        if found_node_pos.any():
+            _, neighbors = find_closest(found_node_pos, self.graph.nodes, 10, dist_limit=self.growth_factor)
+            self.find_best_connection(found_node_pos, neighbors)
     def add_random(self):
         random_point = (np.random.rand(len(self.map_shape)) * self.map_shape).astype(np.int32)
         self.random_point = random_point
-        self.add_node_to_closest(random_point)
+        self.add_node_to_closest_with_speed(random_point)
+        #self.add_node_to_closest(random_point)
 
     def get_path(self):
         node = self.graph[self.end_node]
         self.path = []
         self.path_ind = []
         while node.parent:
-            node = self.graph[node.parent]
             self.path.append(node.pos)
             self.path_ind.append(node.index)
+            node = self.graph[node.parent]
         if not self.graph_printed:
             self.graph_printed = True

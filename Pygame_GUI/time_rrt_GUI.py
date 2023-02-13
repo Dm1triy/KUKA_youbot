@@ -149,14 +149,16 @@ class TimeRrtGui:
         self.tree_running = True
 
     def run(self):
+        i=0
         while self.screen.running:
             self.screen.step()
             if self.tree_running:
                 self.tree.step()
+                i+=1
+                if i % 100 == 0:
+                    print(i)
                 if self.enable_3d:
-                    print("draw_tree begin")
                     self.draw_tree()
-                    print("draw_tree end")
 
     def draw_tree(self):
         nodes = []
@@ -165,7 +167,9 @@ class TimeRrtGui:
         edges = []
         path_len = 1
         for i in range(1, self.tree.graph.node_num):
-            n = self.tree.graph[i].parent
+            if not self.tree.graph[i].parent:
+                continue
+            n = self.tree.graph[i].parent.index
             if n:
                 edges.append(np.array([i, n]).astype(np.int32))
         if self.tree.dist_reached:
