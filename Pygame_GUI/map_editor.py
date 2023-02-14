@@ -36,10 +36,17 @@ class MapEditor(Sprite):
         self.curr_time = int(val)
 
     def release(self, *args, **kwargs):
-        self.update_map()
+        #self.update_map()
+        pass
 
     def update_map(self):
-        pass
+        for i in range(self.map_shape[0]):
+            for j in range(self.map_shape[1]):
+                for k in range(self.map_shape[2]):
+                    if self.full_map[i, j, k] == 1:
+                        self.bin_map[i, j, k] = 1
+                    elif self.full_map[i, j, k] == 0:
+                        self.bin_map[i, j, k] = 0
 
     def input_ttl(self, *args, **kwargs):
         try:
@@ -83,6 +90,7 @@ class MapEditor(Sprite):
                 del self.points[to_del_ind]
                 self.full_map[to_del_param[0], to_del_param[1], to_del_param[2][0]:to_del_param[2][1]] = 0
 
+
     def dragged(self, *args, **kwargs):
         if self.set_mode != 1:
             return
@@ -92,7 +100,6 @@ class MapEditor(Sprite):
         pos = kwargs["mouse_pos"]
         x = int(pos[0] * self.discrete_per_pixel_width)
         y = int(pos[1] * self.discrete_per_pixel_height)
-        self.bin_map[x, y, self.time_range[0]:self.time_range[1]] = setter
         self.full_map[x, y, self.time_range[0]:self.time_range[1]] = setter
 
     def discrete_rect(self, i, j):

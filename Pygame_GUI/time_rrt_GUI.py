@@ -7,6 +7,7 @@ import time
 from Pygame_GUI.map_editor import MapEditor
 
 
+
 class TimeRrtGui:
     def __init__(self, width, height):
         self.map_shape = (30, 30, 100)
@@ -26,7 +27,7 @@ class TimeRrtGui:
 
         self.map_editor = self.screen.sprite(MapEditor, "MapEditor", x=0.0, y=0, width=0.5, height=0.8,
                                              color=(255, 255, 255), map_shape=self.map_shape)
-        self.map_editor.update_map = self.export_3d
+        #self.map_editor.update_map = self.export_3d
 
         self.screen.sprite(Button, "change_cam_mode", x=0.93, y=0.01, width=0.06, height=0.12, color=(150, 255, 170),
                            func=self.change_cam_mode)
@@ -71,6 +72,7 @@ class TimeRrtGui:
         self.bin_map = np.zeros(self.map_shape).astype(np.uint8)
 
     def export_3d(self, *arg, **kwargs):
+        self.screen["MapEditor"].update_map()
         self.tree_running = False
         self.bin_map = self.screen["MapEditor"].bin_map
         exporter_bin_map = self.screen["MapEditor"].bin_map
@@ -153,27 +155,63 @@ class TimeRrtGui:
         #print(time.time() - t)
         self.tree_running = True
 
+
     def run(self):
         i=0
         t = time.time()
         while self.screen.running:
             self.screen.step()
-            if self.tree_running:
-                self.tree.step()
-                i+=1
-                if i % 100 == 0:
-                    print(i, time.time()-t)
-                    t = time.time()
-                if self.enable_3d and self.space_3d.enable:
-                    self.draw_tree()
+            if self.tree_running and self.enable_3d and self.space_3d.enable:
+                self.tree.path_lock.acquire()
+                self.draw_tree()
+                self.tree.path_lock.release()
+    def draw_clear_path(self):
+        number_of_origins = len(self.tree.graph.origin_ind)
+        number_of_ends = len(self.tree.graph.endpoint_ind)
+        nodes = []
+        for j in range(number_of_origins+number_of_ends):
+            nodes.append(np.array([*self.tree.graph.nodes[j], 1]).astype(float_bit))
+        edges = []
+        path_len = 1
+        max_node_ind = number_of_origins+number_of_ends
+        for i in range(1, number_of_origins+number_of_ends):
+            if not self.tree.graph[i].parent:
+                continue
+            n = self.tree.graph[i].parent.index
+            if n and n < max_node_ind:
+                edges.append(np.array([i, n]).astype(np.int32))
+        if self.tree.dist_reached:
+            self.tree.get_path()
+            path_len = len(self.tree.path_ind)
+            last_node_ind = len(nodes)
+            for ind, pos in enumerate(self.tree.path):
+                nodes.append(np.array([*pos, 1]).astype(float_bit))
+                edges.append(np.array([ind+1+last_node_ind, ind+last_node_ind]).astype(np.int32))
 
+
+            other_edges = len(edges) - path_len
+
+            vert_col = [*[[0, 255, 0] for _ in range(number_of_origins)],
+                        *[[0, 0, 255] for _ in range(number_of_ends)],
+                        *[[255, 255, 255] for _ in range(len(nodes) - number_of_origins - number_of_ends)]
+                        ]
+            self.tree_3d_graphics.vertex_colors = np.array(vert_col).astype(np.int32)
+
+            vert_rad = [*[5] * number_of_origins, *[5] * number_of_ends, *[0] * (len(nodes) - number_of_origins - number_of_ends), ]
+            self.tree_3d_graphics.vertex_radius = np.array(vert_rad).astype(np.int16)
+            self.tree_3d_graphics.vertices = np.array(nodes)
+
+            self.tree_3d_graphics.edges_thickness = np.array([*[1] * other_edges, *[5] * path_len]).astype(np.int16)
+            self.tree_3d_graphics.color_edges = np.array(
+                [*[[255, 255, 255] for _ in range(other_edges)], *[[255, 0, 0] for _ in range(path_len)]]).astype(np.int32)
+            self.tree_3d_graphics.edges = np.array(edges).astype(np.int32)
     def draw_tree(self):
         nodes = []
         for j in range(self.tree.graph.nodes.shape[0]):
             nodes.append(np.array([*self.tree.graph.nodes[j], 1]).astype(float_bit))
         edges = []
         path_len = 1
-        for i in range(1, self.tree.graph.node_num):
+        for i in range(1, self.tree.graph.node_num-1):
             if not self.tree.graph[i].parent:
                 continue
             n = self.tree.graph[i].parent.index

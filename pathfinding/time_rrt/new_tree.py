@@ -1,8 +1,11 @@
 import random
 import math
+import time
 
 from pathfinding.time_rrt.fast_math import *
 from pathfinding.time_rrt.rrt_graph import *
+
+import threading as thr
 
 
 class Tree:
@@ -36,6 +39,7 @@ class Tree:
         self.path = []
         self.path_ind = []
         self.graph_printed = False
+        self.main_thr = thr.main_thread()
 
         self.growth_factor = growth_factor
         self.e = e
@@ -52,7 +56,12 @@ class Tree:
             print("No bin_map")
         assert bin_map.any()
 
-    def check_obstacle_old(self, point1, point2):
+        self.path_lock = thr.Lock()
+        self.tree_thr = thr.Thread(target=self.run)
+        self.tree_thr.start()
+
+
+    def check_obstacle_slow(self, point1, point2):
         shift_vector = (point2.astype(np.float32) - point1.astype(np.float32)).astype(np.float32)
         transition = np.linalg.norm(shift_vector[:self.time_dimension])
         time = shift_vector[self.time_dimension]
@@ -96,7 +105,14 @@ class Tree:
         return node, dist, reached
 
     def step(self):
+        self.path_lock.acquire()
         self.add_random()
+        self.path_lock.release()
+
+    def run(self):
+        while self.main_thr.is_alive():
+            self.step()
+            time.sleep(0.006)
 
     def find_best_connection(self, new_node_pos, neighbours):
         neighbours = [self.graph[i] for i in neighbours]

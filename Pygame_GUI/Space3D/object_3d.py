@@ -123,6 +123,8 @@ class Object3D:
                             self.vertex_colors,
                             self.vertex_radius)
         if self.draw_edges:
+
+
             render_edges(*workspace,
                          vertices,
                          self.edges,

@@ -288,7 +288,7 @@ class RRT_sim:
 
 
 
-robot = KUKA('192.168.88.21', ros=False, offline=False, read_depth=False, camera_enable=False, advanced=True)
+robot = KUKA('192.168.88.21', ros=True, offline=False, read_depth=False, camera_enable=False, advanced=False)
 
 rrt_sim = RRT_sim(robot)
 rrt_sim.main_thr()

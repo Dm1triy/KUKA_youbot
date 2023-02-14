@@ -58,14 +58,19 @@ def render_edges(color_mat, depth_mat, priority_mat, vertices, edges, edge_color
     for edge in range(len(edges)):
         all_vert = vertices[edges[edge]]
         th = thickness[edge]
+        if len(all_vert) < 2:
+            continue
         x0, y0, z0, w0 = all_vert[0]
         x1, y1, z1, w1 = all_vert[1]
-        if w0 <= 0 or w1 <= 0:
+        w0 = float(w0)
+        w1 = float(w1)
+        if w0 <= 1e-5 or w1 <= 1e-5 or w0 <= 1e-5 or w1 <= 1e-5:
             continue
         x0, y0, z0 = x0 / w0, y0 / w0, w0
         x1, y1, z1 = x1 / w1, y1 / w1, w1
-
         xl, yl, zl = x1 - x0, y1 - y0, z1 - z0
+        if 1e-8 > yl > -1e-8 and 1e-8 > xl > -1e-8:
+            continue
         xp0 = int((x0 + 1) / 2 * WIDTH)
         xp1 = int((x1 + 1) / 2 * WIDTH)
         yp0 = int((1 - y0) / 2 * HEIGHT)
