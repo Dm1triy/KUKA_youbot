@@ -209,6 +209,8 @@ class KUKA:
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         if self.ip[-1] == "1":
             password = "111111"
+        elif self.ip[-1] == "2":
+            password = "112233"
         elif self.ip[-1] == "3":
             password = "0987654321"
         elif self.ip[-1] == "4":

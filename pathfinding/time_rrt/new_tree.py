@@ -22,8 +22,8 @@ class Tree:
         self.bool_map = bin_map
         self.star = True
         # speed in space discretes per time discretes
-        self.min_speed = 0
-        self.max_speed = 3
+        self.min_speed = 2
+        self.max_speed = 5
         self.min_speed_ang = math.atan(self.min_speed)
         self.max_speed_ang = math.atan(self.max_speed)
         self.time_dimension = 2
@@ -60,47 +60,11 @@ class Tree:
         self.tree_thr = thr.Thread(target=self.run)
         self.tree_thr.start()
 
-
-    def check_obstacle_slow(self, point1, point2):
-        shift_vector = (point2.astype(np.float32) - point1.astype(np.float32)).astype(np.float32)
-        transition = np.linalg.norm(shift_vector[:self.time_dimension])
-        time = shift_vector[self.time_dimension]
-        if time <= 0:
-            return np.array(False), None, False
-        if not self.min_speed <= transition/time <= self.max_speed:
-            return np.array(False), None, False
-        iters = int(sum(abs(shift_vector)) * 2)
-        if iters == 0:
-            return np.array(False), None, False
-        shift_vector = shift_vector / iters
-        all_shift = shift_vector
-        c_point = np.array(False)
-        iters_made = 0
-        for i in range(1, iters + 1):
-            iters_made = i
-            all_shift = np.copy(shift_vector * i)
-            c_point = np.around(point1 + shift_vector * i).astype(np.int64)
-            try:
-                if self.bool_map[tuple(c_point)]:
-                    i -= 1
-                    iters_made = i
-                    break
-                if abs(np.linalg.norm(shift_vector * i)) >= self.growth_factor:
-                    break
-            except IndexError:
-                break
-        if np.linalg.norm(all_shift) < self.e or not c_point.any():
-            return np.array(False), None, False
-        if iters_made > 1:
-            return c_point, np.linalg.norm(all_shift), iters_made == iters
-        else:
-            return np.array(False), None, False
-
     def check_obstacle(self, point1, point2):
-        info = np.zeros(len(point1)+2).astype(np.float32)
+        info = np.zeros(len(point1)+2).astype(np.float64)
         check_obstacle(point1, point2, self.bool_map, self.growth_factor, self.e, self.min_speed, self.max_speed, info)
         node, dist, reached = info[:3], info[3], info[4]
-        node = node.astype(np.int32)
+        node = node.astype(np.float64)
         reached = bool(reached)
         return node, dist, reached
 
@@ -152,20 +116,23 @@ class Tree:
 
 
     def add_node_to_closest_with_speed(self, new_node_pos):
-        _, closest_node_ind = find_closest(new_node_pos, self.graph.nodes, remove_target=self.graph.blocked_nodes)
-        alph, th = np.random.random(2)
-        alph = alph*2*math.pi
-        th = self.min_speed_ang + th * (self.max_speed_ang-self.min_speed_ang)
-        z = self.growth_factor*math.sin(th)
-        lo = self.growth_factor*math.cos(th)
-        x = lo*math.sin(alph)
-        y = lo*math.cos(alph)
-        closest_node = self.graph.nodes[closest_node_ind[0]]
-        new_node_pos = closest_node + np.array([x, y, z]).astype(int)
-        found_node_pos, dist, reached = self.check_obstacle(self.graph.nodes[closest_node_ind[0]], new_node_pos)
+        dist, closest_node_ind = find_closest(new_node_pos, self.graph.nodes, remove_target=self.graph.blocked_nodes)
+        closest_node_pos = self.graph.nodes[closest_node_ind[0]]
+        dist_to_closest = np.linalg.norm(closest_node_pos[:2])
+        delta_pos = new_node_pos - closest_node_pos
+        time_delta = delta_pos[2]
+        curr_th = math.atan2(dist_to_closest, time_delta)
+        th = max(self.min_speed_ang, min(self.max_speed_ang, curr_th))
+        z = dist_to_closest*math.cos(th)
+        x = math.sin(th)*delta_pos[0]
+        y = math.sin(th)*delta_pos[1]
+
+        new_node_pos = closest_node_pos + np.array([x, y, z]).astype(int)
+        found_node_pos, dist, reached = self.check_obstacle(closest_node_pos, new_node_pos)
         if found_node_pos.any():
             _, neighbors = find_closest(found_node_pos, self.graph.nodes, 10, dist_limit=self.growth_factor)
             self.find_best_connection(found_node_pos, neighbors)
+
     def add_random(self):
         random_point = (np.random.rand(len(self.map_shape)) * self.map_shape).astype(np.int32)
         self.random_point = random_point

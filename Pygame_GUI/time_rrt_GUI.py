@@ -135,6 +135,7 @@ class TimeRrtGui:
     def disable_3d(self, *args, **kwargs):
         self.space_3d.enable = not self.space_3d.enable
     def run_rrt(self, *args, **kwargs):
+        self.export_3d()
         origin = self.map_editor.origin
         start_point = [[origin[0], origin[1], i] for i in range(origin[2][0], origin[2][1])]
         end = self.map_editor.end_point

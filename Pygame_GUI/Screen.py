@@ -7,6 +7,8 @@ class Screen:
         self.running = True
         self.objects = dict()
         self.objects_order = []
+        self.raw_draw = dict()
+        self.blit_arr = []
         self.width, self.height = width, height
         self.screen = None
         self.pressed_obj_ind = None
@@ -99,6 +101,11 @@ class Screen:
         self.objects[obj.name] = obj
         self.objects_order.append(obj.name)
 
+    def add_raw(self, func, name, *args):
+        self.raw_draw[name] = [func, args]
+
+    def add_blit(self, img, pos):
+        self.blit_arr.append((img, pos))
     def update_objects(self):
         if self.pressed_obj:
             pomop = self.pressed_obj.convert_to_local(self.mouse_pos)
@@ -122,8 +129,14 @@ class Screen:
 
     def draw_objects(self):
         self.screen.fill(self.bg_color)
+        for img, pos in self.blit_arr:
+            self.screen.blit(img, pos)
+        self.blit_arr = []
         for obj_name in self.objects_order:
             self.objects[obj_name].draw()
+        for func, args in self.raw_draw.values():
+            func(self.screen, *args)
+        self.raw_draw = dict()
 
     def sprite(self, sprite_type, name, **kwargs):
         self.add_object(sprite_type(self, name=name, **kwargs))

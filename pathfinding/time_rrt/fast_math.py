@@ -5,11 +5,11 @@ from numba import njit
 
 @njit(fastmath=True)
 def check_obstacle(point1, point2, bool_map, growth_factor, e, min_speed, max_speed, info):
-    shift_vector = (point2.astype(np.float32) - point1.astype(np.float32)).astype(np.float32)
+    shift_vector = (point2.astype(np.float64) - point1.astype(np.float64)).astype(np.float64)
     info[:3], info[3], info[4] = np.zeros_like(point1), -1, 0
     transition = np.linalg.norm(shift_vector[:2])
     time = shift_vector[2]
-    iters = int(np.linalg.norm(shift_vector) * 2)
+    iters = shift_vector / e
 
     if time <= 0:
         return
@@ -21,6 +21,7 @@ def check_obstacle(point1, point2, bool_map, growth_factor, e, min_speed, max_sp
     all_shift = shift_vector
     point_set = False
     c_point = np.zeros_like(point1).astype(np.int32)
+    c_p = np.zeros_like(point1).astype(np.float64)
     iters_made = 0
     for i in range(1, iters + 1):
         iters_made = i
@@ -38,7 +39,7 @@ def check_obstacle(point1, point2, bool_map, growth_factor, e, min_speed, max_sp
     if np.linalg.norm(all_shift) < e or not point_set:
         info[:3], info[3], info[4] = np.zeros_like(point1), -1, 0
     elif iters_made > 1:
-        info[:3], info[3], info[4] = c_point, np.linalg.norm(all_shift), iters_made == iters
+        info[:3], info[3], info[4] = c_p, np.linalg.norm(all_shift), iters_made == iters
     else:
         info[:3], info[3], info[4] = np.zeros_like(point1), -1, 0
 

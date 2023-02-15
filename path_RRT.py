@@ -20,7 +20,10 @@ class RRT_sim:
         self.discrete = 30
         self.robot_radius = int(0.3*self.discrete+1)
         self.screen_obj = Screen(self.screen_size, self.screen_size)
+        self.screen_obj.init()
+        self.screen_obj.bg_color = (255,255,255)
         self.screen = self.screen_obj.screen
+
         self.move_speed_val = 0.5
         self.last_checked_pressed_keys = []
         self.step = False
@@ -162,7 +165,6 @@ class RRT_sim:
             if not self.start_point.any():
                 #self.start_point = np.array([self.screen_to_arr(self.screen_obj.mouse_pos)]).astype(int)
                 self.start_point = (np.array([self.robot.increment[:2]])*self.discrete+np.array(self.map_shape).T/2).astype(int)
-                print(self.robot.increment[:2])
                 print("start point:", self.start_point)
             elif not self.end_point.any():
                 self.end_point = np.array(self.screen_to_arr(self.screen_obj.mouse_pos)).astype(int)
@@ -172,16 +174,16 @@ class RRT_sim:
         if self.nav_map.any():
             map_img = pg.transform.scale(pg.surfarray.make_surface((self.nav_map * -1 + 1) * 255),
                                          (self.map_shape[0] * self.map_k, self.map_shape[1] * self.map_k))
-            self.screen.blit(map_img, (0, 0))
+            self.screen_obj.add_blit(map_img, (0, 0))
         if self.start_point.any():
             for sp in self.start_point:
-                pg.draw.circle(self.screen, (255, 0, 0), list(map(lambda x: x * self.map_k, sp)), 5)
+                self.screen_obj.add_raw(pg.draw.circle, "sp", (255, 0, 0), list(map(lambda x: x * self.map_k, sp)), 5)
         if self.end_point.any():
-            pg.draw.line(self.screen, (0, 102, 51), [list(map(lambda x: x * self.map_k, self.end_point))[0] - 10,
+            self.screen_obj.add_raw(pg.draw.line,"ep1", (0, 102, 51), [list(map(lambda x: x * self.map_k, self.end_point))[0] - 10,
                                                      list(map(lambda x: x * self.map_k, self.end_point))[1] - 10],
                          [list(map(lambda x: x * self.map_k, self.end_point))[0] + 10,
                           list(map(lambda x: x * self.map_k, self.end_point))[1] + 10], 5)
-            pg.draw.line(self.screen, (0, 102, 51), [list(map(lambda x: x * self.map_k, self.end_point))[0] + 10,
+            self.screen_obj.add_raw(pg.draw.line,"ep2", (0, 102, 51), [list(map(lambda x: x * self.map_k, self.end_point))[0] + 10,
                                                      list(map(lambda x: x * self.map_k, self.end_point))[1] - 10],
                          [list(map(lambda x: x * self.map_k, self.end_point))[0] - 10,
                           list(map(lambda x: x * self.map_k, self.end_point))[1] + 10], 5)
@@ -191,30 +193,30 @@ class RRT_sim:
             if self.robot.increment:
 
                 half = self.map_shape[0] // 2
-                pg.draw.circle(self.screen, (0, 0, 102), list(
+                self.screen_obj.add_raw(pg.draw.circle,"pos", (0, 0, 102), list(
                     map(lambda x: (half + x * self.discrete) * self.map_k, self.robot.increment[:2])), 10)
         else:
             if self.robot.increment_by_wheels:
                 half = self.map_shape[0] // 2
-                pg.draw.circle(self.screen, (0, 0, 102), list(
+                self.screen_obj.add_raw(pg.draw.circle,"pos", (0, 0, 102), list(
                     map(lambda x: (half + x * self.discrete) * self.map_k, self.robot.increment_by_wheels[:2])), 10)
 
     def draw_nodes(self):
         for j in range(self.rrt.nodes.shape[0]):
             i = self.rrt.nodes[j]
-            pg.draw.circle(self.screen, (0, 0, 255), list(map(lambda x: x * self.map_k, i)), 5)
+            self.screen_obj.add_raw(pg.draw.circle,f"node{j}", (0, 0, 255), list(map(lambda x: x * self.map_k, i)), 5)
         #pg.draw.circle(self.screen, (255, 0, 0), list(map(lambda x: x * self.map_k, self.start_point)), 5)
 
     def draw_edges(self):
         for i in range(1, self.rrt.node_num):
             n = self.rrt.graph[i][0]
-            pg.draw.aaline(self.screen, (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.nodes[i])),
+            self.screen_obj.add_raw(pg.draw.aaline, f"edge{i}",(255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.nodes[i])),
                            list(map(lambda x: x * self.map_k, self.rrt.nodes[n])))
-        pg.draw.circle(self.screen, (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.random_point)),
+        self.screen_obj.add_raw(pg.draw.circle, "random", (255, 0, 255), list(map(lambda x: x * self.map_k, self.rrt.random_point)),
                        5)
 
     def draw_path(self):
-        pg.draw.lines(self.screen, (255, 0, 0), False,
+        self.screen_obj.add_raw(pg.draw.lines, "path", (255, 0, 0), False,
                       [[*i] for i in list(map(lambda x: x * self.map_k, self.rrt.path))], 5)
 
     def apply_robot_radius_to_map(self):
@@ -288,7 +290,7 @@ class RRT_sim:
 
 
 
-robot = KUKA('192.168.88.21', ros=True, offline=False, read_depth=False, camera_enable=False, advanced=False)
+robot = KUKA('192.168.88.21', ros=False, offline=False, read_depth=False, camera_enable=False, advanced=False)
 
 rrt_sim = RRT_sim(robot)
 rrt_sim.main_thr()
