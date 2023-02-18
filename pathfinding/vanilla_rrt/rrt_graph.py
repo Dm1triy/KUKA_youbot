@@ -1,5 +1,5 @@
 import numpy as np
-from pathfinding.time_rrt.rrt_node import *
+from pathfinding.vanilla_rrt.rrt_node import *
 
 
 class Graph:
@@ -111,3 +111,21 @@ class Graph:
                 self.graph[i].rank = ENDPOINT
                 if ind in self.blocked_nodes:
                     self.blocked_nodes.remove(ind)
+
+    def rebalance_from(self, node):
+        i = 0
+        if node.parent != None:
+            node.dist_to_origin = node.parent.dist_to_origin + node.dist_to_parent
+        else:
+            node.dist_to_origin = float("inf")
+        curr_layer = node.children[:]
+        while True:
+            next_layer = []
+            for i in curr_layer:
+                c_n = self.graph[i]
+                c_n.dist_to_origin = node.parent.dist_to_origin + node.dist_to_parent
+                next_layer += c_n.children
+            curr_layer = next_layer[:]
+            if i > 10000:
+                print("warning! rebalancing took over 10K iterations")
+                i = 0

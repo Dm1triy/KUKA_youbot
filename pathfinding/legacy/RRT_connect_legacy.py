@@ -1,4 +1,4 @@
-from RRT import *
+from RRT_legacy import *
 
 class RRT_connect():
     def __init__(self, /,

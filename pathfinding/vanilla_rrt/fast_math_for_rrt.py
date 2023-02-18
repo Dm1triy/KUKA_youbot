@@ -4,17 +4,11 @@ import scipy.spatial
 from numba import njit
 
 @njit(fastmath=True)
-def check_obstacle(point1, point2, bool_map, growth_factor, e, min_speed, max_speed, info):
+def check_obstacle(point1, point2, bool_map, growth_factor, e, info):
     shift_vector = (point2.astype(np.float64) - point1.astype(np.float64)).astype(np.float64)
     info[:3], info[3], info[4] = np.zeros_like(point1), -1, 0
     transition = np.linalg.norm(shift_vector[:2])
-    time = shift_vector[2]
-    iters = shift_vector / e
-
-    if time <= 0:
-        return
-    if not min_speed <= transition / time <= max_speed:
-        return
+    iters = int(transition * 2)
     if iters == 0:
         return
     shift_vector = shift_vector / iters
@@ -44,32 +38,28 @@ def check_obstacle(point1, point2, bool_map, growth_factor, e, min_speed, max_sp
         info[:3], info[3], info[4] = np.zeros_like(point1), -1, 0
 
 @njit(fastmath=True)
-def fast_closest(target, src, out_ind, out_dist, n, remove_target):
+def fast_closest(target, src, out_ind, out_dist, n, remove_target, remove_mod):
     for p in range(1, len(src)):
         is_target = False
+        point = src[p]
+        delta = target - point
         for rm_t in remove_target:
             if p == rm_t:
-                is_target = True
+                if remove_mod:
+                    is_target = True
                 break
         if is_target:
             continue
-        point = src[p]
-        dist = np.linalg.norm(point - target)
+        if delta[2] == 0:
+            continue
+        dist_total = np.linalg.norm(delta)
         for i in range(n):
-            if out_dist[i] > dist:
-                out_dist[i] = dist
-                out_ind[i] = p
+            if out_dist[i] > dist_total:
                 for j in range(n - 1, i, -1):
                     out_ind[j] = out_ind[j - 1]
                     out_dist[j] = out_dist[j - 1]
+                out_dist[i] = dist_total
+                out_ind[i] = p
                 break
 
 
-def find_closest(target, src, n=1, /, dist_limit=None, remove_target=(-1, -1)):
-    remove_target = np.array(remove_target).astype(np.int32)
-    target = target.astype(np.float32)
-    out_ind = np.zeros(n).astype(np.int32)
-    out_dist = np.zeros(n).astype(np.float32)
-    out_dist[0] = np.linalg.norm(src[0] - target)
-    fast_closest(target, src, out_ind, out_dist, n, remove_target)
-    return [out_dist[:n], out_ind[:n]]

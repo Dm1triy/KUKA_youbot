@@ -6,7 +6,7 @@ import cv2
 import pygame as pg
 import scipy
 
-from pathfinding.RRT import RRT
+from pathfinding.legacy.RRT_legacy import RRT
 from KUKA.KUKA import KUKA
 from Pygame_GUI.Screen import Screen
 from pathfinding.SLAM import SLAM

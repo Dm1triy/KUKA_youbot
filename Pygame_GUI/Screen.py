@@ -44,6 +44,7 @@ class Screen:
     def step(self):
         if self.running:
             self.handle_events()
+            self.update_mouse()
             self.update_objects()
             self.draw_objects()
             pg.display.update()
@@ -62,8 +63,13 @@ class Screen:
     def get_fps(self):
         return round(self.fps, 2)
 
-    def handle_events(self):
+    def update_mouse(self):
         self.mouse_pos = pg.mouse.get_pos()
+        self.mouse_delta = [self.old_mouse_pos[0] - self.mouse_pos[0], self.old_mouse_pos[1] - self.mouse_pos[1]]
+        self.old_mouse_pos = self.mouse_pos[:]
+
+
+    def handle_events(self):
         for obj_name in self.objects_order[::-1]:
             obj = self.objects[obj_name]
             if obj.rect.collidepoint(self.mouse_pos):
@@ -89,13 +95,13 @@ class Screen:
             elif event.type == pg.MOUSEWHEEL:
                 self.mouse_wheel_pos += event.y
             elif event.type == pg.MOUSEBUTTONDOWN:
+                self.update_mouse()
                 self.mouse_state = [event.button, 1]
                 self.pressed_obj = self.curr_obj
             elif event.type == pg.MOUSEBUTTONUP:
                 self.mouse_state = [event.button, 0]
                 self.released_obj = self.curr_obj
-        self.mouse_delta = [self.old_mouse_pos[0] - self.mouse_pos[0], self.old_mouse_pos[1] - self.mouse_pos[1]]
-        self.old_mouse_pos = self.mouse_pos[:]
+
 
     def add_object(self, obj):
         self.objects[obj.name] = obj
@@ -115,7 +121,7 @@ class Screen:
             pomop = self.released_obj.convert_to_local(self.mouse_pos)
             self.released_obj.release(mouse_pos=pomop, btn_id=self.mouse_state[0])
             self.released_obj = None
-        elif self.curr_obj:
+        if self.curr_obj:
             curr_obj_mouse_pos = self.curr_obj.convert_to_local(self.mouse_pos)
             if (self.mouse_delta[0] or self.mouse_delta[1]) and self.mouse_state[1]:
                 self.curr_obj.dragged(mouse_pos=curr_obj_mouse_pos,

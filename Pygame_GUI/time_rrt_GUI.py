@@ -2,7 +2,7 @@ from Pygame_GUI.Screen import Screen
 from Pygame_GUI.Space3D.Space3D import Space3D
 from Pygame_GUI.Space3D.object_3d import *
 from Pygame_GUI.Objects import *
-from pathfinding.time_rrt.new_tree import Tree
+from pathfinding.time_rrt.time_tree import TimeTree
 import time
 from Pygame_GUI.map_editor import MapEditor
 
@@ -28,37 +28,37 @@ class TimeRrtGui:
         self.map_editor = self.screen.sprite(MapEditor, "MapEditor", x=0.0, y=0, width=0.5, height=0.8,
                                              color=(255, 255, 255), map_shape=self.map_shape)
         #self.map_editor.update_map = self.export_3d
-
         self.screen.sprite(Button, "change_cam_mode", x=0.93, y=0.01, width=0.06, height=0.12, color=(150, 255, 170),
                            func=self.change_cam_mode)
-        self.screen.sprite(Button, "input_TTL", x=0.03, y=0.82, width=0.06, height=0.04, color=(150, 255, 170),
-                           func=self.map_editor.input_ttl)
-        self.screen.sprite(Button, "export_3d", x=0.1, y=0.82, width=0.06, height=0.04, color=(150, 255, 170),
-                           func=self.export_3d)
+        self.screen.sprite(Button, "input_TTL", x=0.03, y=0.82, width=0.06, height=0.08, color=(150, 255, 170),
+                           func=self.map_editor.input_ttl, image="Pygame_GUI/sprite_images/TTL2.png")
+        self.screen.sprite(Button, "export_3d", x=0.1, y=0.82, width=0.06, height=0.08, color=(150, 255, 170),
+                           func=self.export_3d, image="Pygame_GUI/sprite_images/refresh_3d.png")
         self.screen.sprite(Button, "set_origin", x=0.17, y=0.82, width=0.06, height=0.04, color=(0, 255, 0),
                            func=self.map_editor.set_mode_origin)
         self.screen.sprite(Button, "set_point", x=0.24, y=0.82, width=0.06, height=0.04, color=(0, 0, 255),
                            func=self.map_editor.set_mode_point)
-        self.screen.sprite(Button, "set_wall", x=0.31, y=0.82, width=0.06, height=0.04, color=(255, 0, 255),
+        self.screen.sprite(Button, "set_wall", x=0.31, y=0.82, width=0.06, height=0.04, color=(132, 31, 39),
                            func=self.map_editor.set_mode_wall)
-        self.screen.sprite(Button, "run_rrt", x=0.38, y=0.82, width=0.06, height=0.04, color=(255, 0, 255),
-                           func=self.run_rrt)
-        self.screen.sprite(Button, "disable_3d", x=0.45, y=0.82, width=0.06, height=0.04, color=(255, 0, 255),
-                           func=self.disable_3d)
-        self.screen.sprite(Text, "input_TTL_label", x=0.03, y=0.86, inp_text=lambda: "input_TTL", font='serif',
-                           font_size=10)
-        self.screen.sprite(Text, "export_3d_label", x=0.1, y=0.86, inp_text=lambda: "export_3d", font='serif',
-                           font_size=10)
+        self.screen.sprite(Button, "run_rrt", x=0.38, y=0.82, width=0.06, height=0.08, color=(255, 0, 255),
+                           func=self.run_rrt, image="Pygame_GUI/sprite_images/pathfinding.png")
+        self.btn_3d = self.screen.sprite(Button, "disable_3d", x=0.45, y=0.82, width=0.06, height=0.08, color=(255, 0, 255),
+                           func=self.disable_3d, image=("Pygame_GUI/sprite_images/no_3d.png", "Pygame_GUI/sprite_images/3d.png"))
+
+        #self.screen.sprite(Text, "input_TTL_label", x=0.03, y=0.86, inp_text=lambda: "input_TTL", font='serif',
+        #                   font_size=10)
+        #self.screen.sprite(Text, "export_3d_label", x=0.1, y=0.86, inp_text=lambda: "export_3d", font='serif',
+        #                   font_size=10)
         self.screen.sprite(Text, "set_origin_label", x=0.17, y=0.86, inp_text=lambda: "set_origin", font='serif',
                            font_size=10)
         self.screen.sprite(Text, "set_point_label", x=0.24, y=0.86, inp_text=lambda: "set_point", font='serif',
                            font_size=10)
         self.screen.sprite(Text, "set_wall_label", x=0.31, y=0.86, inp_text=lambda: "set_wall", font='serif',
                            font_size=10)
-        self.screen.sprite(Text, "run_rrt_label", x=0.38, y=0.86, inp_text=lambda: "run_rrt", font='serif',
-                           font_size=10)
-        self.screen.sprite(Text, "disable_3d_label", x=0.45, y=0.86, inp_text=lambda: "disable_3d", font='serif',
-                           font_size=10)
+        #self.screen.sprite(Text, "run_rrt_label", x=0.38, y=0.86, inp_text=lambda: "run_rrt", font='serif',
+        #                   font_size=10)
+        #self.screen.sprite(Text, "disable_3d_label", x=0.45, y=0.86, inp_text=lambda: "disable_3d", font='serif',
+        #                   font_size=10)
         self.screen.sprite(Slider, "curr_time", min=0, max=self.map_shape[-1] - 1, x=0.03, y=0.91,
                            width=0.47, height=0.05, color=(150, 160, 170),
                            func=self.screen["MapEditor"].change_curr_time)
@@ -133,8 +133,11 @@ class TimeRrtGui:
         self.space_3d.add_object(map3d)
         self.map3d.draw_faces = True
     def disable_3d(self, *args, **kwargs):
+        self.btn_3d.curr_img = not self.btn_3d.curr_img
         self.space_3d.enable = not self.space_3d.enable
     def run_rrt(self, *args, **kwargs):
+        if self.tree_running:
+            return
         self.export_3d()
         origin = self.map_editor.origin
         start_point = [[origin[0], origin[1], i] for i in range(origin[2][0], origin[2][1])]
@@ -142,9 +145,7 @@ class TimeRrtGui:
         end_point = [[end[0], end[1], i] for i in range(end[2][0], end[2][1])]
         self.orig_len = len(start_point)
         self.end_len = len(end_point)
-
-        self.tree = Tree(start_point=np.array(start_point), end_point=np.array(end_point), bin_map=self.bin_map)
-
+        self.tree = TimeTree(start_point=np.array(start_point), end_point=np.array(end_point), bin_map=self.bin_map)
         if self.enable_3d:
             self.tree_3d_graphics = Hollow3D(self.space_3d, [[0.0, 0.0, 0.0, 1.0],
                                                              [0.0, 0.0, 0.0, 1.0]],
@@ -152,7 +153,7 @@ class TimeRrtGui:
             self.tree_3d_graphics.translate((-15, -15, -50))
             self.space_3d.add_object(self.tree_3d_graphics)
         t = time.time()
-        self.tree.step()
+        self.tree.start_thread()
         #print(time.time() - t)
         self.tree_running = True
 
@@ -163,9 +164,9 @@ class TimeRrtGui:
         while self.screen.running:
             self.screen.step()
             if self.tree_running and self.enable_3d and self.space_3d.enable:
-                self.tree.path_lock.acquire()
+                self.tree.step_lock.acquire()
                 self.draw_tree()
-                self.tree.path_lock.release()
+                self.tree.step_lock.release()
     def draw_clear_path(self):
         number_of_origins = len(self.tree.graph.origin_ind)
         number_of_ends = len(self.tree.graph.endpoint_ind)

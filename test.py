@@ -1,6 +1,17 @@
 import numpy as np
+import sympy
+import sympy.plotting as plt
 
-pr = np.array([[[[[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [1, 2, 3]]], [[[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [1, 2, 3]]]],
-                [[[[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [1, 2, 3]]], [[[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [1, 2, 3]]]]])
-a = np.array([0, 0.23523, 0.54674, 0.9678]).astype(np.int32)
-print(a)
+
+
+t = sympy.symbols("t")
+uv = 2
+uf = 1
+TH_ = uv*sympy.tan(uf)
+TH = sympy.integrate(TH_, t)
+x_ = uv * sympy.cos(TH)
+y_ = uv * sympy.sin(TH)
+x = sympy.integrate(x_, t)
+y = sympy.integrate(y_, t)
+
+plt.plot_parametric((x, x_), (t, 0, 10))

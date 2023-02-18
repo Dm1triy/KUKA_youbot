@@ -1,9 +1,4 @@
-from Pygame_GUI.Screen import Screen
-from Pygame_GUI.Space3D.Space3D import Space3D
-from Pygame_GUI.Space3D.object_3d import *
 from Pygame_GUI.Objects import *
-from pathfinding.RRT import RRT
-import time
 
 
 class MapEditor(Sprite):
