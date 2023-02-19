@@ -10,8 +10,8 @@ class MapEditor2d(Sprite):
         self.discrete_wh = self.width // self.map_shape[0], self.height // self.map_shape[1]
         self.bin_map = np.zeros(self.map_shape).astype(np.uint8)
         self.set_mode = 1
-        self.origin = [1, 1]
-        self.end_point = [29, 29]
+        self.origin = [100, 100]
+        self.end_point = [300, 300]
         self.brush = 1
 
     def set_mode_wall(self, *args, **kwargs):

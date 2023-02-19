@@ -1,18 +1,42 @@
-from Pygame_GUI.Screen import Screen
-from Pygame_GUI.Space3D.Space3D import Space3D
-from Pygame_GUI.Space3D.object_3d import *
-from Pygame_GUI.Objects import *
-from pathfinding.time_rrt.time_tree import Tree
-import time
-from Pygame_GUI.map_editor_2d import MapEditor2d
+import math
 
+import cv2
+
+from Pygame_GUI.Objects import *
+from Pygame_GUI.Screen import Screen
+from Pygame_GUI.Space3D.object_3d import *
+from Pygame_GUI.map_editor_2d import MapEditor2d
+from pathfinding.vanilla_rrt.rrt_tree import TreeRRT
+
+
+def generate_kernel(rad):
+    out = np.zeros((1 + rad * 2, 1 + rad * 2))
+    x, y = rad, rad
+    init = 60
+    for di in range(-rad, rad + 1):
+        for dj in range(-rad, rad + 1):
+            i, j = x + di, y + dj
+            out[i, j] = init - math.sqrt(di ** 2 + dj ** 2)
+    return out
+
+
+def generate_kernel_2(rad):
+    out = np.zeros((1 + rad * 2, 1 + rad * 2))
+    x, y = rad, rad
+    for di in range(-rad, rad + 1):
+        for dj in range(-rad, rad + 1):
+            i, j = x + di, y + dj
+            if di ** 2 + dj ** 2 < rad ** 2:
+                out[i, j] = -1
+    out[rad, rad] = rad**2
+    return out
 
 
 class RrtTestGui:
     def __init__(self, width, height):
-        self.map_shape = (800, 800)
+        self.map_shape = (400, 400)
         self.width, self.height = width, height
-        self.screen = Screen(1000, 1250)
+        self.screen = Screen(900, 1100)
         self.screen.init()
 
         self.map_editor = self.screen.sprite(MapEditor2d, "MapEditor", x=0.0, y=0, width=1, height=0.8,
@@ -23,6 +47,8 @@ class RrtTestGui:
                            func=self.map_editor.set_mode_point)
         self.screen.sprite(Button, "set_wall", x=0.52, y=0.82, width=0.12, height=0.04, color=(132, 31, 39),
                            func=self.map_editor.set_mode_wall)
+        self.screen.sprite(Button, "generate_field", x=0.80, y=0.82, width=0.12, height=0.04, color=(132, 180, 39),
+                           func=self.generate_field)
         self.screen.sprite(Button, "run_rrt", x=0.66, y=0.82, width=0.12, height=0.08, color=(255, 0, 255),
                            func=self.run_rrt, image="Pygame_GUI/sprite_images/pathfinding.png")
 
@@ -48,16 +74,35 @@ class RrtTestGui:
         start_point = self.map_editor.origin
         end_point = self.map_editor.end_point
 
-        self.tree = Tree(start_point=np.array(start_point), end_point=np.array(end_point), bin_map=self.bin_map)
+        self.tree = TreeRRT(start_point=np.array(start_point), end_point=np.array(end_point), bin_map=self.bin_map)
         self.tree.step()
         self.tree_running = True
 
+    def generate_field(self, *args, **kwargs):
+        # Reading the image
+        image = (self.map_editor.bin_map.astype(np.uint8) == 1).astype(np.uint8)
+        image_neg = (self.map_editor.bin_map.astype(np.uint8) != 1).astype(np.uint8)
+
+        # Creating the kernel(2d convolution matrix)
+        kernel1 = generate_kernel(70) / 5
+
+        img = cv2.filter2D(src=image, ddepth=-1, kernel=kernel1)
+        ksize = 100
+        #blur_image = cv2.blur(image_neg*255, (ksize, ksize))
+        blur_image = cv2.filter2D(src=image_neg, ddepth=-1, kernel=generate_kernel_2(50))
+        out_image = ((blur_image) != image) * image_neg
+        cv2.imshow('Original', image_neg*255)
+        #cv2.imshow('blur_image', (blur_image)*10)
+        cv2.imshow('Special interest', blur_image)
+
+
+
+        cv2.waitKey()
+        cv2.destroyAllWindows()
 
     def run(self):
         while self.screen.running:
             self.screen.step()
-
-
 
 
 trgui = RrtTestGui(WIDTH, HEIGHT)
