@@ -58,7 +58,7 @@ class RrtTestGui:
                            font_size=10)
         self.screen.sprite(Text, "set_wall_label", x=0.52, y=0.86, inp_text=lambda: "set_wall", font='serif',
                            font_size=10)
-        self.screen.sprite(Slider, "curr_time", min=0, max=20, x=0.03, y=0.91,
+        self.screen.sprite(Slider, "curr_time", min=0, max=20, val=20, x=0.03, y=0.91,
                            width=0.94, height=0.05, color=(150, 160, 170),
                            func=self.screen["MapEditor"].change_brush_size)
 
@@ -91,9 +91,9 @@ class RrtTestGui:
         #blur_image = cv2.blur(image_neg*255, (ksize, ksize))
         blur_image = cv2.filter2D(src=image_neg, ddepth=-1, kernel=generate_kernel_2(50))
         out_image = ((blur_image) != image) * image_neg
-        cv2.imshow('Original', image_neg*255)
+        cv2.imshow('Original', image*255)
         #cv2.imshow('blur_image', (blur_image)*10)
-        cv2.imshow('Special interest', blur_image)
+        cv2.imshow('Special interest', blur_image*image_neg)
 
 
 

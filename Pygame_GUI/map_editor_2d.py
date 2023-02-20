@@ -12,7 +12,7 @@ class MapEditor2d(Sprite):
         self.set_mode = 1
         self.origin = [100, 100]
         self.end_point = [300, 300]
-        self.brush = 1
+        self.brush = 20
 
     def set_mode_wall(self, *args, **kwargs):
         self.set_mode = 1

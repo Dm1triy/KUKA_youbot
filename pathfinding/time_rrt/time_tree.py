@@ -29,15 +29,19 @@ class TimeTree(TreeRRT):
         reached = bool(reached)
         return node, dist, reached
 
-    def find_closest(self, target, n=1, /, remove_endpoints=False):
+    def find_closest(self, target, n=1, /, src=None, remove_endpoints=False):
         remove_mod = remove_endpoints
+        if not src:
+            src = slice(0, self.graph.node_num)
         remove_target = np.array(self.graph.blocked_nodes).astype(np.int32)
         target = target.astype(np.float32)
         out_ind = np.zeros(n).astype(np.int32)
         out_dist = np.ones(n).astype(np.float32) * -1
         out_dist[0] = np.linalg.norm(self.graph.nodes[0] - target)
-        fast_closest(target, self.graph.nodes, out_ind, out_dist, n, remove_target, remove_mod, self.max_speed,
+        fast_closest(target, self.graph.nodes[src], out_ind, out_dist, n, remove_target, remove_mod, self.max_speed,
                      self.min_speed)
+        print(out_ind)
+        out_ind = np.array(src)[out_ind]
         return [out_dist[:n], out_ind[:n]]
 
     def check_neighbours(self, new_node, neighbours):
