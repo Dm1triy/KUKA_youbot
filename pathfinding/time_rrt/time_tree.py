@@ -32,20 +32,26 @@ class TimeTree(TreeRRT):
     def find_closest(self, target, n=1, /, src=None, remove_endpoints=False):
         remove_mod = remove_endpoints
         if not src:
-            src = slice(0, self.graph.node_num)
+            src = range(self.graph.node_num)
         remove_target = np.array(self.graph.blocked_nodes).astype(np.int32)
         target = target.astype(np.float32)
-        out_ind = np.zeros(n).astype(np.int32)
+        out_ind = np.ones(n).astype(np.int32) * -1
+        out_ind[0] = src[0]
         out_dist = np.ones(n).astype(np.float32) * -1
-        out_dist[0] = np.linalg.norm(self.graph.nodes[0] - target)
+        out_dist[0] = np.linalg.norm(self.graph.nodes[src[0]] - target)
+        if len(src) < 2:
+            return [out_dist[:n], out_ind[:n]]
+
         fast_closest(target, self.graph.nodes[src], out_ind, out_dist, n, remove_target, remove_mod, self.max_speed,
                      self.min_speed)
-        print(out_ind)
-        out_ind = np.array(src)[out_ind]
+        if n > 1:
+            out_ind = np.array(src)[out_ind]
         return [out_dist[:n], out_ind[:n]]
 
     def check_neighbours(self, new_node, neighbours):
         for neighbour_ind in neighbours:
+            if neighbour_ind < 0:
+                break
             neighbour = self.graph[neighbour_ind]
             if neighbour.rank == ORIGIN_BLOCKED:
                 continue
@@ -61,9 +67,7 @@ class TimeTree(TreeRRT):
                             self.dist_reached = True
                             self.end_node = neighbour.index
 
-    def new_from_rand(self, rand_point, closest_node_pos):
-        dist, closest_node_ind = self.find_closest(rand_point, remove_endpoints=True)
-        closest_node_pos = self.graph.nodes[closest_node_ind[0]]
+    def new_from_rand1(self, rand_point, closest_node_pos):
         dist_to_closest = np.linalg.norm(closest_node_pos[:2])
         delta_pos = rand_point - closest_node_pos
         time_delta = delta_pos[2]
