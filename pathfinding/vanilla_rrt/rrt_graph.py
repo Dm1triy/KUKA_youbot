@@ -82,27 +82,6 @@ class Graph:
             parent.add_child(self.graph[nn])
         return self.graph[nn]
 
-    def update_endpoints(self, endpoint):
-        if self.earliest_endpoint_ind != -1:
-            if endpoint.index < self.earliest_endpoint_ind:
-                self.earliest_endpoint_ind = endpoint.index
-        else:
-            self.earliest_endpoint_ind = endpoint.index
-        for i in range(len(self.endpoint_ind)-1, -1):
-            endpoint_node = self.graph[self.endpoint_ind[i]]
-            prev_endpoint_node = self.graph[self.endpoint_ind[i-1]]
-            endpoint_node.parent.del_child(self)
-            endpoint_node.parent = prev_endpoint_node
-            prev_endpoint_node.add_child(endpoint_node)
-            endpoint_node.dist_to_parent = np.linalg.norm(prev_endpoint_node.pos - endpoint_node.pos)
-            endpoint_node.dist_to_origin = prev_endpoint_node.parent.dist_to_origin + endpoint_node.dist_to_parent
-
-    def unblock_end(self, ind):
-        for i in self.endpoint_ind:
-            if i > ind:
-                self.graph[i].rank = ENDPOINT
-                if ind in self.blocked_nodes:
-                    self.blocked_nodes.remove(ind)
 
 
     def unblock_origin(self, ind):

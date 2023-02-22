@@ -14,6 +14,7 @@ class MapEditor(Sprite):
         self.set_mode = 1
         self.origin = [1, 1, [0, 99]]
         self.end_point = [29, 29, [0, 99]]
+        self.points = []
         self.full_map = np.zeros(self.map_shape).astype(np.uint16)
         self.point_ind = 3
         self.points = dict()
@@ -60,12 +61,15 @@ class MapEditor(Sprite):
         pos = kwargs["mouse_pos"]
         x = int(pos[0] * self.discrete_per_pixel_width)
         y = int(pos[1] * self.discrete_per_pixel_height)
+        if x >= self.bin_map.shape[0] or y >= self.bin_map.shape[1]:
+            return
         if kwargs["btn_id"] == 1:
             if not self.full_map[x, y, self.time_range[0]:self.time_range[1]].any():
 
                 if self.set_mode == 2:
                     self.full_map[self.origin[0], self.origin[1], self.origin[2][0]:self.origin[2][1]] = 0
                     self.origin = [x, y, self.time_range]
+                    self.points[0] = [x, y, self.time_range]
                     self.full_map[x, y, self.time_range[0]:self.time_range[1]] = self.set_mode
                 elif self.set_mode == 3:
                     self.full_map[x, y, self.time_range[0]:self.time_range[1]] = self.point_ind
@@ -87,14 +91,16 @@ class MapEditor(Sprite):
 
 
     def dragged(self, *args, **kwargs):
-        if self.set_mode != 1:
+        setter = 1
+        if kwargs["btn_id"] == 3:
+            setter = 0
+        elif self.set_mode != 1:
             return
-        setter = 0
-        if kwargs["btn_id"] == 1:
-            setter = 1
         pos = kwargs["mouse_pos"]
         x = int(pos[0] * self.discrete_per_pixel_width)
         y = int(pos[1] * self.discrete_per_pixel_height)
+        if x >= self.bin_map.shape[0] or y >= self.bin_map.shape[1]:
+            return
         self.full_map[x, y, self.time_range[0]:self.time_range[1]] = setter
 
     def discrete_rect(self, i, j):

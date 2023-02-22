@@ -15,8 +15,8 @@ class TimeTree(TreeRRT):
         super().__init__(**kwargs)
 
         # speed in space discretes per time discretes
-        self.min_speed = 2
-        self.max_speed = 5
+        self.min_speed = 5
+        self.max_speed = 10
         self.min_speed_ang = math.atan(self.min_speed)
         self.max_speed_ang = math.atan(self.max_speed)
         self.time_dimension = 2
@@ -47,36 +47,3 @@ class TimeTree(TreeRRT):
         if n > 1:
             out_ind = np.array(src)[out_ind]
         return [out_dist[:n], out_ind[:n]]
-
-    def check_neighbours(self, new_node, neighbours):
-        for neighbour_ind in neighbours:
-            if neighbour_ind < 0:
-                break
-            neighbour = self.graph[neighbour_ind]
-            if neighbour.rank == ORIGIN_BLOCKED:
-                continue
-            _, dist, reached = self.check_obstacle(new_node.pos, neighbour.pos)
-            if reached:
-                if dist + new_node.dist_to_origin < neighbour.dist_to_origin:
-                    if neighbour.rank not in [ORIGIN_BLOCKED, ORIGIN]:
-                        neighbour.new_parent(new_node)
-                        if neighbour.rank == ENDPOINT_BLOCKED:
-                            neighbour.rank = ENDPOINT
-                            self.graph.update_endpoints(neighbour)
-                            self.graph.unblock_end(neighbour.index)
-                            self.dist_reached = True
-                            self.end_node = neighbour.index
-
-    def new_from_rand1(self, rand_point, closest_node_pos):
-        dist_to_closest = np.linalg.norm(closest_node_pos[:2])
-        delta_pos = rand_point - closest_node_pos
-        time_delta = delta_pos[2]
-        curr_th = math.atan2(dist_to_closest, time_delta)
-        th = max(self.min_speed_ang, min(self.max_speed_ang, curr_th))
-        z = dist_to_closest * math.cos(th)
-        x = math.sin(th) * delta_pos[0]
-        y = math.sin(th) * delta_pos[1]
-
-        new_node_pos = closest_node_pos + np.array([x, y, z]).astype(int)
-        new_node_pos, dist, reached = self.check_obstacle(closest_node_pos, new_node_pos)
-        return new_node_pos

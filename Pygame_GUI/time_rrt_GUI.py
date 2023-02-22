@@ -1,11 +1,13 @@
+import random
+
 from Pygame_GUI.Screen import Screen
 from Pygame_GUI.Space3D.Space3D import Space3D
 from Pygame_GUI.Space3D.object_3d import *
 from Pygame_GUI.Objects import *
-from pathfinding.time_rrt.time_tree import TimeTree
+from pathfinding.multiple_tree_control import MultiTree
 import time
 from Pygame_GUI.map_editor import MapEditor
-
+import random
 
 
 class TimeRrtGui:
@@ -27,7 +29,7 @@ class TimeRrtGui:
 
         self.map_editor = self.screen.sprite(MapEditor, "MapEditor", x=0.0, y=0, width=0.5, height=0.8,
                                              color=(255, 255, 255), map_shape=self.map_shape)
-        #self.map_editor.update_map = self.export_3d
+        # self.map_editor.update_map = self.export_3d
         self.screen.sprite(Button, "change_cam_mode", x=0.93, y=0.01, width=0.06, height=0.12, color=(150, 255, 170),
                            func=self.change_cam_mode)
         self.screen.sprite(Button, "input_TTL", x=0.03, y=0.82, width=0.06, height=0.08, color=(150, 255, 170),
@@ -42,12 +44,14 @@ class TimeRrtGui:
                            func=self.map_editor.set_mode_wall)
         self.screen.sprite(Button, "run_rrt", x=0.38, y=0.82, width=0.06, height=0.08, color=(255, 0, 255),
                            func=self.run_rrt, image="Pygame_GUI/sprite_images/pathfinding.png")
-        self.btn_3d = self.screen.sprite(Button, "disable_3d", x=0.45, y=0.82, width=0.06, height=0.08, color=(255, 0, 255),
-                           func=self.disable_3d, image=("Pygame_GUI/sprite_images/no_3d.png", "Pygame_GUI/sprite_images/3d.png"))
+        self.btn_3d = self.screen.sprite(Button, "disable_3d", x=0.45, y=0.82, width=0.06, height=0.08,
+                                         color=(255, 0, 255),
+                                         func=self.disable_3d, image=(
+            "Pygame_GUI/sprite_images/no_3d.png", "Pygame_GUI/sprite_images/3d.png"))
 
-        #self.screen.sprite(Text, "input_TTL_label", x=0.03, y=0.86, inp_text=lambda: "input_TTL", font='serif',
+        # self.screen.sprite(Text, "input_TTL_label", x=0.03, y=0.86, inp_text=lambda: "input_TTL", font='serif',
         #                   font_size=10)
-        #self.screen.sprite(Text, "export_3d_label", x=0.1, y=0.86, inp_text=lambda: "export_3d", font='serif',
+        # self.screen.sprite(Text, "export_3d_label", x=0.1, y=0.86, inp_text=lambda: "export_3d", font='serif',
         #                   font_size=10)
         self.screen.sprite(Text, "set_origin_label", x=0.17, y=0.86, inp_text=lambda: "set_origin", font='serif',
                            font_size=10)
@@ -55,9 +59,9 @@ class TimeRrtGui:
                            font_size=10)
         self.screen.sprite(Text, "set_wall_label", x=0.31, y=0.86, inp_text=lambda: "set_wall", font='serif',
                            font_size=10)
-        #self.screen.sprite(Text, "run_rrt_label", x=0.38, y=0.86, inp_text=lambda: "run_rrt", font='serif',
+        # self.screen.sprite(Text, "run_rrt_label", x=0.38, y=0.86, inp_text=lambda: "run_rrt", font='serif',
         #                   font_size=10)
-        #self.screen.sprite(Text, "disable_3d_label", x=0.45, y=0.86, inp_text=lambda: "disable_3d", font='serif',
+        # self.screen.sprite(Text, "disable_3d_label", x=0.45, y=0.86, inp_text=lambda: "disable_3d", font='serif',
         #                   font_size=10)
         self.screen.sprite(Slider, "curr_time", min=0, max=self.map_shape[-1] - 1, x=0.03, y=0.91,
                            width=0.47, height=0.05, color=(150, 160, 170),
@@ -66,14 +70,17 @@ class TimeRrtGui:
         self.old_pressed_keys = []
         self.old_mouse_pos = [0, 0]
         self.screen.add_fps_indicator()
+        self.path_colors = []
 
-        self.tree_running = False
+        self.multi_tree_running = False
 
         self.bin_map = np.zeros(self.map_shape).astype(np.uint8)
 
     def export_3d(self, *arg, **kwargs):
         self.screen["MapEditor"].update_map()
-        self.tree_running = False
+        if self.multi_tree_running:
+            del self.multi_tree
+        self.multi_tree_running = False
         self.bin_map = self.screen["MapEditor"].bin_map
         exporter_bin_map = self.screen["MapEditor"].bin_map
         if not self.enable_3d:
@@ -132,97 +139,83 @@ class TimeRrtGui:
         map3d = Solid3D(self.space_3d, vertices, edges, pos=(-16.5, -16.5, -51.5))
         self.space_3d.add_object(map3d)
         self.map3d.draw_faces = True
+
     def disable_3d(self, *args, **kwargs):
         self.btn_3d.curr_img = not self.btn_3d.curr_img
         self.space_3d.enable = not self.space_3d.enable
+
     def run_rrt(self, *args, **kwargs):
-        if self.tree_running:
+        if self.multi_tree_running:
+            del self.multi_tree
             return
         self.export_3d()
-        origin = self.map_editor.origin
-        start_point = [[origin[0], origin[1], i] for i in range(origin[2][0], origin[2][1])]
-        end = self.map_editor.end_point
-        end_point = [[end[0], end[1], i] for i in range(end[2][0], end[2][1])]
-        self.orig_len = len(start_point)
-        self.end_len = len(end_point)
-        self.tree = TimeTree(start_point=np.array(start_point), end_point=np.array(end_point), bin_map=self.bin_map)
+        points = [i[1] for i in sorted(self.map_editor.points.items(), key=lambda x:x[0])]
+        self.multi_tree = MultiTree(points, self.bin_map)
         if self.enable_3d:
-            self.tree_3d_graphics = Hollow3D(self.space_3d, [[0.0, 0.0, 0.0, 1.0],
-                                                             [0.0, 0.0, 0.0, 1.0]],
-                                             [[0, 0]], edges_thickness=[1])
-            self.tree_3d_graphics.translate((-15, -15, -50))
-            self.space_3d.add_object(self.tree_3d_graphics)
+            self.multi_tree_3d_graphics = Hollow3D(self.space_3d, [[0.0, 0.0, 0.0, 1.0],
+                                                                   [0.0, 0.0, 0.0, 1.0]],
+                                                   [[0, 0]], edges_thickness=[1])
+            self.multi_tree_3d_graphics.translate((-15, -15, -50))
+            self.space_3d.add_object(self.multi_tree_3d_graphics)
         t = time.time()
-        self.tree.start_thread()
-        #print(time.time() - t)
-        self.tree_running = True
-
+        self.multi_tree.start_thread()
+        # print(time.time() - t)
+        self.multi_tree_running = True
 
     def run(self):
-        i=0
+        i = 0
         t = time.time()
         while self.screen.running:
             self.screen.step()
-            if self.tree_running and self.enable_3d and self.space_3d.enable:
-                self.tree.step_lock.acquire()
-                self.draw_tree()
-                self.tree.step_lock.release()
+            if self.multi_tree_running and self.enable_3d and self.space_3d.enable:
+                self.draw_clear_path()
+
     def draw_clear_path(self):
-        number_of_origins = len(self.tree.graph.origin_ind)
-        number_of_ends = len(self.tree.graph.endpoint_ind)
         nodes = []
-        for j in range(number_of_origins+number_of_ends):
-            nodes.append(np.array([*self.tree.graph.nodes[j], 1]).astype(float_bit))
         edges = []
-        path_len = 1
-        max_node_ind = number_of_origins+number_of_ends
-        for i in range(1, number_of_origins+number_of_ends):
-            if not self.tree.graph[i].parent:
-                continue
-            n = self.tree.graph[i].parent.index
-            if n and n < max_node_ind:
-                edges.append(np.array([i, n]).astype(np.int32))
-        if self.tree.dist_reached:
-            self.tree.get_path()
-            path_len = len(self.tree.path_ind)
-            last_node_ind = len(nodes)
-            for ind, pos in enumerate(self.tree.path):
-                nodes.append(np.array([*pos, 1]).astype(float_bit))
-                edges.append(np.array([ind+1+last_node_ind, ind+last_node_ind]).astype(np.int32))
+        vert_col = []
+        vert_rad = []
+        edges_thickness = []
+        color_edges = []
+        path, lens = self.multi_tree.get_path()
+        print(path)
+        if path:
+            for i, pos in enumerate(path):
+                nodes.append(np.array([*pos, 1]))
+                edges.append([i, i+1])
+            edges = edges[:-1]
+            vert_col = [[255, 255, 255] for _ in range(len(nodes))]
+            vert_rad = [*[0] * len(nodes)]
+            edges_thickness = [*[5] * len(edges)]
+            for i in range(len(lens)):
+                if i >= len(self.path_colors):
+                    self.path_colors.append([random.randint(0,255),random.randint(0,255),random.randint(0,255)])
+                color_edges += [*[self.path_colors[i] for _ in range(lens[i])]]
+            self.multi_tree_3d_graphics.vertex_colors = np.array(vert_col).astype(np.int32)
+            self.multi_tree_3d_graphics.vertex_radius = np.array(vert_rad).astype(np.int16)
+            self.multi_tree_3d_graphics.vertices = np.array(nodes)
+            self.multi_tree_3d_graphics.edges_thickness = np.array(edges_thickness).astype(np.int16)
+            self.multi_tree_3d_graphics.color_edges = np.array(color_edges).astype(np.int32)
+            self.multi_tree_3d_graphics.edges = np.array(edges).astype(np.int32)
 
 
-            other_edges = len(edges) - path_len
-
-            vert_col = [*[[0, 255, 0] for _ in range(number_of_origins)],
-                        *[[0, 0, 255] for _ in range(number_of_ends)],
-                        *[[255, 255, 255] for _ in range(len(nodes) - number_of_origins - number_of_ends)]
-                        ]
-            self.tree_3d_graphics.vertex_colors = np.array(vert_col).astype(np.int32)
-
-            vert_rad = [*[5] * number_of_origins, *[5] * number_of_ends, *[0] * (len(nodes) - number_of_origins - number_of_ends), ]
-            self.tree_3d_graphics.vertex_radius = np.array(vert_rad).astype(np.int16)
-            self.tree_3d_graphics.vertices = np.array(nodes)
-
-            self.tree_3d_graphics.edges_thickness = np.array([*[1] * other_edges, *[5] * path_len]).astype(np.int16)
-            self.tree_3d_graphics.color_edges = np.array(
-                [*[[255, 255, 255] for _ in range(other_edges)], *[[255, 0, 0] for _ in range(path_len)]]).astype(np.int32)
-            self.tree_3d_graphics.edges = np.array(edges).astype(np.int32)
     def draw_tree(self):
         nodes = []
-        for j in range(self.tree.graph.nodes.shape[0]):
-            nodes.append(np.array([*self.tree.graph.nodes[j], 1]).astype(float_bit))
+        for j in range(self.multi_tree.graph.nodes.shape[0]):
+            nodes.append(np.array([*self.multi_tree.graph.nodes[j], 1]).astype(float_bit))
         edges = []
         path_len = 1
-        for i in range(1, self.tree.graph.node_num-1):
-            if not self.tree.graph[i].parent:
+        for i in range(1, self.multi_tree.graph.node_num - 1):
+            if not self.multi_tree.graph[i].parent:
                 continue
-            n = self.tree.graph[i].parent.index
-            if n:
+            n = self.multi_tree.graph[i].parent.index
+            if n != None:
                 edges.append(np.array([i, n]).astype(np.int32))
-        if self.tree.dist_reached:
-            self.tree.get_path()
-            path_len = len(self.tree.path_ind)
-            edges += [np.array([self.tree.path_ind[p], self.tree.path_ind[p + 1]]).astype(np.int32) for p in range(path_len - 1)]
+        if self.multi_tree.dist_reached:
+            self.multi_tree.get_path()
+            path_len = len(self.multi_tree.path_ind)
+            edges += [np.array([self.multi_tree.path_ind[p], self.multi_tree.path_ind[p + 1]]).astype(np.int32) for p in
+                      range(path_len - 1)]
 
         path_len -= 1
         other_edges = len(edges) - path_len
@@ -231,18 +224,16 @@ class TimeRrtGui:
                     *[[0, 0, 255] for _ in range(self.end_len)],
                     *[[255, 255, 255] for _ in range(len(nodes) - self.orig_len - self.end_len)]
                     ]
-        self.tree_3d_graphics.vertex_colors = np.array(vert_col).astype(np.int32)
+        self.multi_tree_3d_graphics.vertex_colors = np.array(vert_col).astype(np.int32)
 
-        vert_rad = [*[5]*self.orig_len,*[5]*self.end_len,  *[0] * (len(nodes) - self.orig_len - self.end_len), ]
-        self.tree_3d_graphics.vertex_radius = np.array(vert_rad).astype(np.int16)
-        self.tree_3d_graphics.vertices = np.array(nodes)
+        vert_rad = [*[5] * self.orig_len, *[5] * self.end_len, *[0] * (len(nodes) - self.orig_len - self.end_len), ]
+        self.multi_tree_3d_graphics.vertex_radius = np.array(vert_rad).astype(np.int16)
+        self.multi_tree_3d_graphics.vertices = np.array(nodes)
 
-
-        self.tree_3d_graphics.edges_thickness = np.array([*[1] * other_edges, *[5] * path_len]).astype(np.int16)
-        self.tree_3d_graphics.color_edges = np.array(
+        self.multi_tree_3d_graphics.edges_thickness = np.array([*[1] * other_edges, *[5] * path_len]).astype(np.int16)
+        self.multi_tree_3d_graphics.color_edges = np.array(
             [*[[255, 255, 255] for _ in range(other_edges)], *[[255, 0, 0] for _ in range(path_len)]]).astype(np.int32)
-        self.tree_3d_graphics.edges = np.array(edges).astype(np.int32)
-
+        self.multi_tree_3d_graphics.edges = np.array(edges).astype(np.int32)
 
     def change_cam_mode(self, *args, **kwargs):
         self.space_3d.camera.mode = not self.space_3d.camera.mode

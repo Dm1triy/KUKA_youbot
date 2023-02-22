@@ -1,12 +1,5 @@
 import numpy as np
-
-
-ORIGIN = 0
-ORIGIN_BLOCKED = 1
-SLAVE = 2
-ENDPOINT = 3
-ENDPOINT_BLOCKED = 4
-
+from pathfinding.vanilla_rrt.constants import *
 
 class Node:
     def __init__(self, index, parent, pos, /, dist_to_origin=float('inf'), rank=SLAVE, children=None):

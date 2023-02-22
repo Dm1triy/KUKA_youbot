@@ -22,14 +22,12 @@ class TreeRRT:
         self.bool_map = bin_map
 
         self.graph = Graph(start_point=start_point, start_point_available=start_point_available, end_point=end_point)
-        self.rand_list = [range(len(start_point) + len(end_point))]
 
         map_shape = self.bool_map.shape
         self.map_shape = (map_shape - np.ones(len(map_shape))).astype(np.int32)
         self.stuck = 0
         self.force_random = 0
         self.dist_reached = False
-        self.end_node = -1
         self.path = []
         self.path_ind = []
         self.graph_printed = False
@@ -37,6 +35,7 @@ class TreeRRT:
         self.main_thr = thr.main_thread()
         self.opened_nodes = [x for x in self.graph.graph.keys()]
         self.closed_nodes = []
+        self.reached_nodes_ind = []
 
         if not start_point.any():
             print("No start point")
@@ -61,6 +60,8 @@ class TreeRRT:
         self.rrt_star_rad = rrt_star_rad
         # biases for random
         self.open_list_bias = 0.9
+        self.path_ends = []
+        self.shortest_path = float("inf")
 
     def check_obstacle(self, point1, point2):
         info = np.zeros(len(point1) + 2).astype(np.float64)
@@ -94,7 +95,7 @@ class TreeRRT:
     def new_from_rand(self, rand_point, closest_node_pos):
         new_node_pos, dist, reached = self.check_obstacle(closest_node_pos, rand_point)
         dist, closest = self.find_closest(new_node_pos, self.overpopulation_num)
-        if dist[-1] > self.overpopulation_radius:
+        if dist[-1] < 0 or dist[-1] > self.overpopulation_radius:
             return new_node_pos
         else:
             return np.array([False])
@@ -108,16 +109,25 @@ class TreeRRT:
 
     def check_neighbours(self, node, neighbours):
         for neighbour_ind in neighbours:
+            if neighbour_ind < 0:
+                break
             neighbour = self.graph[neighbour_ind]
+            if neighbour.rank == ORIGIN_BLOCKED:
+                continue
             _, dist, reached = self.check_obstacle(node.pos, neighbour.pos)
             if reached:
                 if dist + node.dist_to_origin < neighbour.dist_to_origin:
                     if neighbour.rank not in [ORIGIN_BLOCKED, ORIGIN]:
                         neighbour.new_parent(node)
-                        if neighbour.rank in [ENDPOINT_BLOCKED, ENDPOINT]:
+                        if neighbour.rank == ENDPOINT_BLOCKED:
                             neighbour.rank = ENDPOINT
                             self.dist_reached = True
-                            self.end_node = neighbour.index
+                            if neighbour.dist_to_origin < self.shortest_path:
+                                self.path_ends.insert(0, neighbour.index)
+                                self.shortest_path = neighbour.dist_to_origin
+                            else:
+                                self.path_ends.append(neighbour.index)
+
 
     def step(self):
         # generate random point
@@ -130,7 +140,7 @@ class TreeRRT:
                 src = self.opened_nodes
         _, closest_node_ind = self.find_closest(rand_point, src=src, remove_endpoints=True)
         # skip to the next iteration if none has been found
-        if not closest_node_ind.any() or closest_node_ind[0] < 0:
+        if closest_node_ind[0] < 0:
             return False
 
         closest_node_pos = self.graph.nodes[closest_node_ind[0]]
@@ -164,13 +174,13 @@ class TreeRRT:
         self.tree_thr = thr.Thread(target=self.run)
         self.tree_thr.start()
 
-    def get_path(self):
-        node = self.graph[self.end_node]
-        self.path = []
-        self.path_ind = []
+    def get_path(self, path_ind=0):
+        node = self.graph[self.path_ends[path_ind]]
+        self.path = [node.pos]
+        self.path_ind = [node.index]
         while node.parent:
-            self.path.append(node.pos)
-            self.path_ind.append(node.index)
             node = self.graph[node.parent]
-        if not self.graph_printed:
-            self.graph_printed = True
+            if node.rank not in [ENDPOINT_BLOCKED, ORIGIN_BLOCKED]:
+                self.path.append(node.pos)
+                self.path_ind.append(node.index)
+        return self.path
