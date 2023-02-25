@@ -1,6 +1,7 @@
 import numpy as np
 from pathfinding.vanilla_rrt.constants import *
 
+
 class Node:
     def __init__(self, index, parent, pos, /, dist_to_origin=float('inf'), rank=SLAVE, children=None):
 
@@ -10,7 +11,6 @@ class Node:
         self.dist_to_origin = dist_to_origin
         self.index = index
         self.rank = rank
-
 
         if children:
             for i in children:
@@ -24,8 +24,6 @@ class Node:
             self.dist_to_parent = np.linalg.norm(parent.pos - pos)
         else:
             self.dist_to_parent = float('inf')
-
-
 
     def __str__(self):
         return f"ind: {str(self.index)}\tparent: {str(self.parent.index)};\tpos: {str(self.pos)};\tchildren: {str(self.children)};\trank: {str(self.rank)};\tdist_to_origin: {str(self.dist_to_origin)}"
@@ -45,7 +43,7 @@ class Node:
             self.parent.del_child(self)
         self.parent = n_parent
         n_parent.add_child(self)
-        self.dist_to_parent = np.linalg.norm(n_parent.pos-self.pos)
+        self.dist_to_parent = np.linalg.norm(n_parent.pos - self.pos)
         self.rebalance()
 
     def rebalance(self):
@@ -56,5 +54,18 @@ class Node:
         for i in self.children:
             i.rebalance()
 
-
-
+    @property
+    def rank_str(self):
+        r = self.rank
+        if r == 0:
+            return "ORIGIN"
+        elif r == 1:
+            return "ORIGIN_BLOCKED"
+        elif r == 2:
+            return "SLAVE"
+        elif r == 3:
+            return "ENDPOINT"
+        elif r == 4:
+            return "ENDPOINT_BLOCKED"
+        else:
+            return "UNKNOWN_RANK"

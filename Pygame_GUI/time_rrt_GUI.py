@@ -147,7 +147,7 @@ class TimeRrtGui:
     def run_rrt(self, *args, **kwargs):
         if self.multi_tree_running:
             del self.multi_tree
-            return
+            self.multi_tree_running = False
         self.export_3d()
         points = [i[1] for i in sorted(self.map_editor.points.items(), key=lambda x:x[0])]
         self.multi_tree = MultiTree(points, self.bin_map)
@@ -169,6 +169,7 @@ class TimeRrtGui:
             self.screen.step()
             if self.multi_tree_running and self.enable_3d and self.space_3d.enable:
                 self.draw_clear_path()
+        self.multi_tree.print_report()
 
     def draw_clear_path(self):
         nodes = []
@@ -178,7 +179,6 @@ class TimeRrtGui:
         edges_thickness = []
         color_edges = []
         path, lens = self.multi_tree.get_path()
-        print(path)
         if path:
             for i, pos in enumerate(path):
                 nodes.append(np.array([*pos, 1]))

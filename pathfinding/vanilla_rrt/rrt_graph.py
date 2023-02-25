@@ -12,7 +12,15 @@ class Graph:
 
         # first point
         self.graph = dict()
-        self.graph[0] = Node(0, None, start_point[0], dist_to_origin=0)
+        if start_point_available[0]:
+            rank = ORIGIN
+            self.available_parents = [0]
+        else:
+            rank = ORIGIN_BLOCKED
+            self.available_parents = []
+        self.opened_nodes = self.available_parents[:]
+        self.closed_nodes = []
+        self.graph[0] = Node(0, None, start_point[0], dist_to_origin=0, rank=rank)
         self.nodes = np.array([start_point[0]]).astype(np.float32)
         self.node_num = 1
         self.earliest_endpoint_ind = -1
@@ -27,10 +35,10 @@ class Graph:
             self.origin_ind.append(i)
             self.add_node(i - 1, start_point[i], [], rank)
 
+
         if end_point.any():
             # end points
             self.endpoint_ind = []
-            self.blocked_nodes = []
             self.endpoint_ind.append(self.node_num)
             self.add_node(None, end_point[0], [], ENDPOINT_BLOCKED)
             for i in range(0, len(end_point)):
@@ -77,6 +85,9 @@ class Graph:
                               dist_to_origin=dist)
         self.nodes = np.append(self.nodes, [pos], axis=0).astype(np.int32)
         self.node_num += 1
+        if rank not in [ORIGIN_BLOCKED, ENDPOINT_BLOCKED, ENDPOINT]:
+            self.available_parents.append(nn)
+            self.opened_nodes.append(nn)
 
         if parent != None:
             parent.add_child(self.graph[nn])
@@ -87,9 +98,11 @@ class Graph:
     def unblock_origin(self, ind):
         for i in self.origin_ind:
             if i > ind:
-                self.graph[i].rank = ENDPOINT
-                if ind in self.blocked_nodes:
-                    self.blocked_nodes.remove(ind)
+                self.graph[i].rank = ORIGIN
+                if i in self.blocked_nodes:
+                    self.blocked_nodes.remove(i)
+                    self.available_parents.append(i)
+                    self.opened_nodes.append(i)
 
     def rebalance_from(self, node):
         i = 0
@@ -108,3 +121,8 @@ class Graph:
             if i > 10000:
                 print("warning! rebalancing took over 10K iterations")
                 i = 0
+
+    def move_from_opened_to_closed(self, ind):
+        if ind not in self.closed_nodes and ind in self.opened_nodes:
+            self.closed_nodes.append(ind)
+            self.opened_nodes.remove(ind)

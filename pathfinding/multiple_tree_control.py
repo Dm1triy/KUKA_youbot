@@ -35,6 +35,7 @@ class MultiTree:
                             if curr_tree.graph[i].rank == ENDPOINT:
                                 unblock = i - len(next_tree.graph.origin_ind)
                                 next_tree.graph.unblock_origin(unblock)
+                                break
 
     def start_thread(self):
         self.tree_thr = thr.Thread(target=self.run)
@@ -46,8 +47,24 @@ class MultiTree:
         for tree_ind in self.active_trees_ind:
             curr_tree = self.trees[tree_ind]
             if curr_tree.dist_reached:
-                path = curr_tree.get_path()
+                last_node = sorted(curr_tree.path_ends, key=lambda x:curr_tree.graph[x].pos[-1])[0]
+                path = curr_tree.get_path(last_node)
                 out_path += path[::-1]
                 paths_lens.append(len(path))
         return out_path, paths_lens
+
+    def print_report(self):
+        for tree_ind in self.active_trees_ind:
+            curr_tree = self.trees[tree_ind]
+            print("tree", tree_ind)
+            print(curr_tree.graph.available_parents)
+            print(curr_tree.graph.opened_nodes)
+            print(curr_tree.graph.closed_nodes)
+            for i in range(curr_tree.graph.node_num):
+                if curr_tree.graph[i].rank != SLAVE:
+                    print("node", i, curr_tree.graph[i].rank_str)
+            if curr_tree.dist_reached:
+                last_node = sorted(curr_tree.path_ends, key=lambda x: curr_tree.graph[x].pos[-1])[0]
+                path = curr_tree.get_path(last_node)
+                print(path[::-1])
 

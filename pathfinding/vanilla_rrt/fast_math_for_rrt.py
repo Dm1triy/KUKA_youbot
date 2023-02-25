@@ -38,18 +38,10 @@ def check_obstacle(point1, point2, bool_map, growth_factor, e, info):
         info[:3], info[3], info[4] = np.zeros_like(point1), -1, 0
 
 @njit(fastmath=True)
-def fast_closest(target, src, out_ind, out_dist, n, remove_target, remove_mod):
+def fast_closest(target, src, out_ind, out_dist, n, inv):
     for p in range(1, len(src)):
-        is_target = False
         point = src[p]
-        delta = target - point
-        for rm_t in remove_target:
-            if p == rm_t:
-                if remove_mod:
-                    is_target = True
-                break
-        if is_target:
-            continue
+        delta = (target - point)*inv
         if delta[2] == 0:
             continue
         dist_total = np.linalg.norm(delta)

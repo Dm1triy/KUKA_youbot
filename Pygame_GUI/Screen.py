@@ -55,6 +55,7 @@ class Screen:
     def run(self):
         while self.running:
             self.step()
+        pg.quit()
 
     def end(self):
         self.running = False
@@ -80,12 +81,10 @@ class Screen:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 self.running = False
-                pg.quit()
                 return
             elif event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE:
                     self.running = False
-                    pg.quit()
                     return
                 else:
                     self.pressed_keys.append(event.key)

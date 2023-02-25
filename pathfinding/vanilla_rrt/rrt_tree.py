@@ -33,8 +33,7 @@ class TreeRRT:
         self.graph_printed = False
         self.random_point = None
         self.main_thr = thr.main_thread()
-        self.opened_nodes = [x for x in self.graph.graph.keys()]
-        self.closed_nodes = []
+
         self.reached_nodes_ind = []
 
         if not start_point.any():
@@ -63,9 +62,12 @@ class TreeRRT:
         self.path_ends = []
         self.shortest_path = float("inf")
 
+    def fast_math_check_obstacle(self, point1, point2, info):
+        check_obstacle(point1, point2, self.bool_map, self.growth_factor, self.e, info)
+
     def check_obstacle(self, point1, point2):
         info = np.zeros(len(point1) + 2).astype(np.float64)
-        check_obstacle(point1, point2, self.bool_map, self.growth_factor, self.e, info)
+        self.fast_math_check_obstacle(point1, point2, info)
         node, dist, reached = info[:3], info[3], info[4]
         node = node.astype(np.int32)
         reached = bool(reached)
@@ -74,37 +76,48 @@ class TreeRRT:
     def generate_rand_point(self):
         return (np.random.rand(len(self.map_shape)) * self.map_shape).astype(np.int32)
 
-    def find_closest(self, target, n=1, /, remove_endpoints=False, src=None):
-        remove_mod = remove_endpoints
+    def fast_math_closest(self, target, src, out_ind, out_dist, n, inv):
+        fast_closest(target, src, out_ind, out_dist, n, inv)
+
+    def find_closest(self, target, n=1, /, src=None, inv=1):
+        """
+        find the closest node to the target
+        :param target: a target node
+        :param n: wanted number of neighbours to find
+        :param src:
+        :param inv: inverse (1 if searching for parent, -1 if searching for child)
+        :return: array of indices and distances
+        """
+        assert inv == 1 or inv == -1
         if not src:
-            src = range(self.graph.node_num)
-        remove_target = np.array(self.graph.blocked_nodes).astype(np.int32)
+            src = list(range(self.graph.node_num))
         target = target.astype(np.float32)
         out_ind = np.ones(n).astype(np.int32) * -1
-        out_ind[0] = src[0]
         out_dist = np.ones(n).astype(np.float32) * -1
         out_dist[0] = np.linalg.norm(self.graph.nodes[src[0]] - target)
         if len(src) < 2:
             return [out_dist[:n], out_ind[:n]]
-
-        fast_closest(target, self.graph.nodes[src], out_ind, out_dist, n, remove_target, remove_mod)
+        self.fast_math_closest(target, self.graph.nodes[src], out_ind, out_dist, n, inv)
         if n > 1:
             out_ind = np.array(src)[out_ind]
+        else:
+            out_ind = [src[out_ind[0]]]
         return [out_dist[:n], out_ind[:n]]
 
     def new_from_rand(self, rand_point, closest_node_pos):
         new_node_pos, dist, reached = self.check_obstacle(closest_node_pos, rand_point)
-        dist, closest = self.find_closest(new_node_pos, self.overpopulation_num)
-        if dist[-1] < 0 or dist[-1] > self.overpopulation_radius:
-            return new_node_pos
-        else:
-            return np.array([False])
+        return new_node_pos
+        # overpopulation (broken)
+        #dist, closest = self.find_closest(new_node_pos, self.overpopulation_num)
+        #if dist[-1] < 0 or dist[-1] > self.overpopulation_radius:
+        #    return new_node_pos
+        #else:
+        #    return np.array([False])
 
     def add_new_node(self, pos, parent_ind):
         parent = self.graph[parent_ind]
         if pos.any():
             new_node = self.graph.add_node(parent, pos)
-            self.opened_nodes.append(new_node.index)
             return new_node
 
     def check_neighbours(self, node, neighbours):
@@ -128,17 +141,20 @@ class TreeRRT:
                             else:
                                 self.path_ends.append(neighbour.index)
 
-
     def step(self):
         # generate random point
         rand_point = self.generate_rand_point()
 
         # find the closest existing node to generated point
-        src = None
+        src = self.graph.available_parents[:]
         if self.open_closed_lists:
             if np.random.random() > self.open_list_bias:
-                src = self.opened_nodes
-        _, closest_node_ind = self.find_closest(rand_point, src=src, remove_endpoints=True)
+                src = self.graph.opened_nodes[:]
+            else:
+                src = self.graph.closed_nodes[:]
+        if len(src) < 1:
+            return False
+        _, closest_node_ind = self.find_closest(rand_point, src=src)
         # skip to the next iteration if none has been found
         if closest_node_ind[0] < 0:
             return False
@@ -149,9 +165,7 @@ class TreeRRT:
         new_node_pos = self.new_from_rand(rand_point, closest_node_pos)
         # skip to the next iteration if none has been found
         if not new_node_pos.any():
-            if closest_node_ind not in self.closed_nodes:
-                self.closed_nodes.append(*closest_node_ind)
-                self.opened_nodes.remove(closest_node_ind)
+            self.graph.move_from_opened_to_closed(closest_node_ind)
             return False
 
         # add new node to graph
@@ -159,7 +173,7 @@ class TreeRRT:
 
         # check all nodes in the area and rebalance if needed
         if self.star:
-            _, neighbours = self.find_closest(rand_point)
+            _, neighbours = self.find_closest(new_node_pos, inv=-1)
             self.check_neighbours(new_node, neighbours)
         return True
 
@@ -175,7 +189,7 @@ class TreeRRT:
         self.tree_thr.start()
 
     def get_path(self, path_ind=0):
-        node = self.graph[self.path_ends[path_ind]]
+        node = self.graph[path_ind]
         self.path = [node.pos]
         self.path_ind = [node.index]
         while node.parent:
