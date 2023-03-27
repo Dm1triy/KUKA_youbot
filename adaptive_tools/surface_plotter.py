@@ -98,7 +98,7 @@ class SurfaceMap:
 
     def create_surface_map(self):
         while self.running:
-            self.running = (cv.waitKey() != 27)
+            self.running = cv.waitKey(40) != 27
             self.floor_img = self.robot.camera_BGR()
             self.angles = self.robot.arm
             self.robot_pos, _ = self.robot.lidar
