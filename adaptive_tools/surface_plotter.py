@@ -245,13 +245,13 @@ class SurfaceMap:
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
 
     @staticmethod
-    def get_img_from_log(path=r'/home/kpu/dev/__/KUKA_youbot/debug/floor.jpg'):
+    def get_img_from_log(path='/home/kpu/dev/__/KUKA_youbot/debug/floor.jpg'):
         img = cv.imread(path)
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         return img
 
     @staticmethod
-    def get_angs_from_log(path=r'/home/kpu/dev/__/KUKA_youbot/debug/armpos.txt'):
+    def get_angs_from_log(path='/home/kpu/dev/__/KUKA_youbot/debug/armpos.txt'):
         path = path
         f = open(path, "r")
         angles = list(map(float, f.read().split(' ')))
