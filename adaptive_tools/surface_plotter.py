@@ -1,24 +1,29 @@
 import numpy as np
 import cv2 as cv
 import skimage
+import time
 
 
 class ForwardKinematics:
-    def __init__(self, robot):
+    def __init__(self, robot, debug=False):
         # arm_base is manipulator pos if x=0, y=0 are the coords of the robot's center and z=0 is ground
         self.arm_base = 0, 0.18, 0.3
         self.link_len = [0.16, 0.14, 0.11]  # m2_len, m3_len, m4_len in meters
         self.robot = robot
+        self.debug = debug
 
-        self.angles = self.robot.arm  # 5 angles of 1-5 links in radiansу
+        if not self.debug:
+            self.angles = self.robot.arm  # 5 angles of 1-5 links in radiansу
+        else:
+            self.angles = self.read_angs_from_log()
 
     def update_arm(self):
         self.angles = self.robot.arm
 
     @staticmethod
-    def read_angs():
-        arm = 'armpos.txt'
-        f = open(arm, "r")
+    def read_angs_from_log(path='debug/armpos.txt'):
+        path = path
+        f = open(path, "r")
         angles = list(map(float, f.read().split(' ')))
         f.close()
         return angles
@@ -58,11 +63,11 @@ class ForwardKinematics:
 
 
 class SurfaceMap:
-    def __init__(self, robot):
+    def __init__(self, robot, debug=False):
         self.robot = robot
-        self.cell_size = 0.05 # meters
-        self.map_width = 251
-        self.map_height = 251
+        self.cell_size = 0.05   # meters
+        self.map_width = 301
+        self.map_height = 301
         self.surface_map = np.array([[[100, 100, 100]] * self.map_width] * self.map_height, dtype=np.uint8)
         self.start_x, self.start_y = self.map_width//2, self.map_height//2
 
@@ -76,31 +81,57 @@ class SurfaceMap:
         # arm_base is manipulator pos if x=0, y=0 are the coords of the robot's center and z=0 is ground
         self.arm_base = 0, 0.18, 0.3
 
-        # robot values in the moment
-        self.floor_img = robot.camera_BGR()
-        self.angles = self.robot.arm
-        self.robot_pos = self.robot.calculated_pos
+        if robot:
+            # robot values in the moment
+            self.floor_img = robot.camera_BGR()
+            self.angles = self.robot.arm
+            self.robot_pos, _ = self.robot.lidar
+            self.running = True
+        else:
+            self.floor_img = self.get_img_from_log()
+            self.angles = self.get_angs_from_log()
+            self.robot_pos = [2.0, -0.5, np.radians(30)]
 
         cam_coords = self.forward_kinematics()
         self.arm_pos = cam_coords[:3]
-        self.angle = np.radians(cam_coords[-1])
-
-        self.running = True
+        self.arm_angle = np.radians(cam_coords[-1])
 
     def create_surface_map(self):
-        while self.running and self.robot.operating:
+        while self.running:
+            self.running = (cv.waitKey() != 27)
             self.floor_img = self.robot.camera_BGR()
             self.angles = self.robot.arm
-            self.robot_pos = self.robot.calculated_pos
+            self.robot_pos, _ = self.robot.lidar
 
             cam_coords = self.forward_kinematics()
             self.arm_pos = cam_coords[:3]
-            self.angle = np.radians(cam_coords[-1])
+            self.arm_angle = np.radians(cam_coords[-1])
 
-            transformed_img = self.perspective_transform()
-            floor_dims = self.get_floor_sizes()
-            local_map = self.map_from_img(transformed_img, floor_dims)
-            self.update_surf_map(local_map)
+            if self.robot_pos and sum(self.angles):
+                transformed_img = self.perspective_transform()
+                floor_dims = self.get_floor_sizes()
+                local_map = self.map_from_img(transformed_img, floor_dims)
+                self.update_surf_map(local_map)
+                img = cv.resize(self.surface_map, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
+                cv.imshow("map", img)
+            time.sleep(1)
+
+    def debug(self):
+        def display_img(img, size=(500, 500)):
+            scale_width = size[0]//img.shape[0]
+            scale_height = size[1]//img.shape[1]
+            img = cv.resize(img, size, interpolation=cv.INTER_NEAREST)
+            cv.imshow('Floor', img)
+            cv.waitKey(0)
+            cv.destroyAllWindows()
+
+        display_img(self.floor_img)
+        transformed_img = self.perspective_transform()
+        display_img(transformed_img)
+        floor_dims = self.get_floor_sizes()
+        local_map = self.map_from_img(transformed_img, floor_dims)
+        self.update_surf_map(local_map)
+        display_img(self.surface_map)
 
     def forward_kinematics(self):
         """
@@ -136,7 +167,7 @@ class SurfaceMap:
         return cam_pos  # x, y, z, theta
 
     def perspective_transform(self):
-        step = self.floor_img.shape[0] * np.tan(self.angle)
+        step = self.floor_img.shape[0] * np.tan(self.arm_angle)
         shift = 40  # it is related to camera tilt
         # old dots
         pt_a = [step, 0]
@@ -161,7 +192,7 @@ class SurfaceMap:
         :return: width_x and width_y of the floor in meters
         """
         cam_height = self.arm_pos[-1]
-        theta = self.angle
+        theta = self.arm_angle
 
         top = cam_height * np.tan(np.pi/2 - theta + self.vert_FoV/2)
         bottom = cam_height * np.tan(np.pi/2 - theta - self.vert_FoV/2)
@@ -177,9 +208,57 @@ class SurfaceMap:
         return local_map
 
     def update_surf_map(self, local_map):
-        robot_cell = self.pos_to_cell(self.robot_pos[0], self.robot_pos[1])
-        arm_len = np.linalg.norm(self.arm_pos)
+        from itertools import product
 
+        robot_x, robot_y = self.pos_to_cell(self.robot_pos[0], self.robot_pos[1])
+        robot_ang = self.robot_pos[2]
+        arm_len = np.linalg.norm([self.arm_pos[0], self.arm_pos[1]])
+        arm_x, arm_y = robot_x + (arm_len / self.cell_size) * np.cos(self.arm_angle), \
+                       robot_y + (arm_len / self.cell_size) * np.sin(self.arm_angle)
+
+        dist_from_cam = self.arm_pos[-1] * np.tan(np.pi/2 - self.arm_angle - self.vert_FoV/2)
+        x_from_cam = dist_from_cam / self.cell_size * np.cos(robot_ang)
+        y_from_cam = dist_from_cam / self.cell_size * np.sin(robot_ang)
+
+        img_edge_x = int(arm_x + x_from_cam)
+        img_edge_y = int(arm_y + y_from_cam)
+
+        iter_x, iter_y = range(local_map.shape[0]), range(local_map.shape[1])
+        for i, j in product(iter_x, iter_y):
+            affine_mat = np.array([[np.cos(robot_ang), -np.sin(robot_ang)],
+                                   [np.sin(robot_ang), np.cos(robot_ang)]])
+            new_i, new_j = np.matmul(affine_mat, np.array([i, j]))
+            diff_j, diff_i = (local_map.shape[1]//2 - 1) * np.cos(robot_ang), \
+                             (local_map.shape[1]//2) * np.sin(robot_ang)
+            new_i = np.around(img_edge_x + new_i + diff_i).astype(int)
+            new_j = np.around(img_edge_y + new_j - diff_j).astype(int)
+            self.surface_map[new_j, new_i] = local_map[-i, j]
+
+        self.surface_map = cv.medianBlur(self.surface_map, 3)
+
+        self.surface_map[self.start_y, self.start_x] = [0, 0, 0]
+        self.surface_map[robot_y, robot_x] = [255, 0, 0]
+        # self.surface_map[arm_y, arm_x] = [255, 0, 0]
+        self.surface_map[img_edge_y, img_edge_x] = [255, 0, 0]
 
     def pos_to_cell(self, x, y):
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
+
+    @staticmethod
+    def get_img_from_log(path=r'/home/kpu/dev/__/KUKA_youbot/debug/floor.jpg'):
+        img = cv.imread(path)
+        img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        return img
+
+    @staticmethod
+    def get_angs_from_log(path=r'/home/kpu/dev/__/KUKA_youbot/debug/armpos.txt'):
+        path = path
+        f = open(path, "r")
+        angles = list(map(float, f.read().split(' ')))
+        f.close()
+        return angles
+
+
+if __name__ == '__main__':
+    adapt = SurfaceMap(None, debug=True)
+    adapt.debug()
