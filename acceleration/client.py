@@ -21,6 +21,7 @@ class Client:
 
         self.velocity = 0
         self.vel_proj = (0, 0)
+        self.vel_updated = False
 
         self.vel_lock = thr.Lock()
         self.vel_thr = thr.Thread(target=self.interaction(), args=())
@@ -66,14 +67,15 @@ class Client:
             with self.vel_lock:
                 self.vel_proj = vel_x, vel_y
                 self.velocity = velocity
+                self.vel_updated = True
 
     def get_velocity(self):
-        while not self.is_data_available:
+        while not self.vel_updated:
             time.sleep(0.05)
 
-        with self.recdata_lock:
-            self.is_data_available = False
-        return self.latest_data
+        with self.vel_lock:
+            self.vel_updated = False
+        return self.velocity
 
 
 if __name__ == "__main__":
