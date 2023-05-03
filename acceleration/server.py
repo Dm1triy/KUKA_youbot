@@ -5,7 +5,8 @@ import threading as thr
 
 
 class Server:
-    def __init__(self, host='192.168.88.24', port=6543):
+    def __init__(self, host='192.168.88.24', port=6543, info=True):
+        self.info = False
         self.accel_stream = Accel()
         self.host = host
         self.port = port
@@ -35,9 +36,10 @@ class Server:
             if data == "Give me acceleration":
                 accel = self.get_accel()    #accelerations, period between to measures, getting time
                 sending_time = time.time()
-                print(f"(Server):\n    Sending time: {sending_time}, Delay {time.time()-accel[2]}\n")
                 msg = f'{accel[0][0]}, {accel[0][1]}, {accel[0][2]}, {accel[1]}, {accel[2]}'
-                print(f"    {msg}")
+                if self.info:
+                    print(f"(Server):\n    Sending time: {sending_time}, Delay {time.time()-accel[2]}\n")
+                    print(f"    {msg}")
                 self.conn.sendall(str.encode(msg))
                 continue
             if data == "Stop":

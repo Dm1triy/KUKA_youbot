@@ -4,7 +4,8 @@ import threading as thr
 
 
 class Accel:
-    def __init__(self):
+    def __init__(self, info=False):
+        self.info = info
         self.port = '/dev/ttyUSB0'
         self.timeout = 1
         self.is_connected = False
@@ -48,7 +49,8 @@ class Accel:
                 print(str(line, "utf-8"))
                 continue
             accel = list(map(float, line.strip().split()[1::2]))
-            #print(f'(Serial):\n    Get Accelerometer data: X={accel[0]}, Y={accel[1]}, Z={accel[2]}, delay={period}\n')
+            if self.info:
+                print(f'(Serial):\n    Get Accelerometer data: X={accel[0]}, Y={accel[1]}, Z={accel[2]}, delay={period}\n')
             self.lock.acquire()
             self.last_data = [accel, period, get_time]
             self.is_data_available = True
@@ -62,7 +64,8 @@ class Accel:
         while time.time() < time_ceiling:
             get_time = time.time()
             if self.ser.in_waiting:
-                #print(f"Data is ready! get_time: {get_time} \nperiod {get_time-start_time}")
+                if self.info:
+                    print(f"Data is ready! get_time: {get_time} \nperiod {get_time-start_time}")
                 return True, get_time-start_time, get_time
             time.sleep(period)
         print(f"(Serial):\n    Timeout {self.port}\n")

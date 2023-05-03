@@ -5,18 +5,31 @@ import numpy as np
 
 
 class Client:
-    def __init__(self, host='192.168.88.21', port=6543):
+    def __init__(self, host='192.168.88.21', port=6543, info=True):
         self.host = host
         self.port = port
+        self.info = info
+
         self.client_socket = socket.socket()
-        self.client_socket.connect((self.host, self.port))
+        self.connected = True
+        while True:
+            try:
+                self.client_socket.connect((self.host, self.port))
+            except socket.error as e:
+                if self.connected:
+                    print("Cant connect to the accel server")
+                    self.connected = False
+                continue
+
+        self.connected = True
+
         print("(Client)\n    Connected to the server!")
 
         self.latest_data = None
         self.is_data_available = False
 
         self.recdata_lock = thr.Lock()
-        self.recdata_thr = thr.Thread(target=self.interaction(), args=())
+        self.recdata_thr = thr.Thread(target=self.interaction, args=())
         self.recdata_thr.start()
 
         self.velocity = 0
@@ -24,7 +37,7 @@ class Client:
         self.vel_updated = False
 
         self.vel_lock = thr.Lock()
-        self.vel_thr = thr.Thread(target=self.interaction(), args=())
+        self.vel_thr = thr.Thread(target=self.velocity_stream, args=())
         self.vel_thr.start()
 
     def __del__(self):
@@ -37,10 +50,10 @@ class Client:
             self.client_socket.sendall(b"Give me acceleration")
             data = self.client_socket.recv(1024).decode()   # accX, accY, accZ, period between mesures, getting_time
             receiving_time = time.time()
-            print(f"(Client)\n    Receiving Time: {receiving_time}")
             processed_data = list(map(float, data.split(", ")))
-            print(f"    Processed data: X:{processed_data[0]}, Y:{processed_data[1]}, Z:{processed_data[2]}\n"
-                  f"    Getting time: {processed_data[4]}, Delay: {receiving_time - processed_data[4]}")
+            if self.info:
+                print(f"    Processed data: X:{processed_data[0]}, Y:{processed_data[1]}, Z:{processed_data[2]}\n"
+                      f"    Getting time: {processed_data[4]}, Delay: {receiving_time - processed_data[4]}")
 
             self.recdata_lock.acquire()
             self.latest_data = [[processed_data[0], processed_data[1], processed_data[2]],

@@ -2,6 +2,8 @@ import numpy as np
 import cv2 as cv
 import skimage
 import time
+import threading as thr
+from acceleration.client import Client
 
 
 class ForwardKinematics:
@@ -63,8 +65,14 @@ class ForwardKinematics:
 
 
 class SurfaceMap:
-    def __init__(self, robot, debug=False):
+    def __init__(self, robot, client, debug=False):
         self.robot = robot
+        self.client = client        # for accelerometer vel receiving
+
+        self.vel_counter = None
+        self.accel_velocity = None
+        self.odom_velocity = None
+
         self.cell_size = 0.05   # meters
         self.map_width = 501
         self.map_height = 501
@@ -87,6 +95,8 @@ class SurfaceMap:
             self.angles = self.robot.arm
             self.robot_pos, _ = self.robot.lidar
             self.running = True
+            vel_thr = thr.Thread(target=self.update_velocity, args=())
+            vel_thr.start()
         else:
             self.floor_img = self.get_img_from_log()
             self.angles = self.get_angs_from_log()
@@ -95,6 +105,16 @@ class SurfaceMap:
         cam_coords = self.forward_kinematics()
         self.arm_pos = cam_coords[:3]
         self.arm_angle = np.radians(cam_coords[-1])
+
+    def update_velocity(self):
+        while self.running:
+            self.accel_velocity = self.client.get_velocity()    # absolute velocity
+            while self.vel_counter == self.robot.odom_speed_counter:
+                time.sleep(0.05)
+            self.vel_counter = self.robot.odom_speed_counter
+            self.odom_velocity = self.robot.odom_speed_data     # Vx, Vy, rotation
+            abs_vel_odom = np.linalg.norm([self.odom_velocity[0], self.odom_velocity[1]])
+            print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
 
     def create_surface_map(self):
         while self.running:
@@ -241,6 +261,7 @@ class SurfaceMap:
         self.surface_map = cv.circle(self.surface_map, (robot_x, robot_y), 5, [255, 0, 0], 5)
         # self.surface_map[arm_y, arm_x] = [255, 0, 0]
         self.surface_map[img_edge_y, img_edge_x] = [255, 0, 0]
+        # Putting text
 
     def pos_to_cell(self, x, y):
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
