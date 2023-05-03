@@ -3,7 +3,6 @@ from Pygame_GUI.GUI_pygame import GuiControl
 from adaptive_tools.surface_plotter import SurfaceMap
 from acceleration.client import Client
 import threading as thr
-import time
 
 
 client = Client()

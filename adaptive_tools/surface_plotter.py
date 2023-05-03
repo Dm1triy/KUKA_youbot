@@ -4,6 +4,7 @@ import skimage
 import time
 import threading as thr
 from acceleration.client import Client
+from KUKA.KUKA import YouBot
 
 
 class ForwardKinematics:
@@ -67,7 +68,7 @@ class ForwardKinematics:
 class SurfaceMap:
     def __init__(self, robot, client, debug=False):
         self.robot = robot
-        self.client = client        # for accelerometer vel receiving
+        self.client = client       # for accelerometer vel receiving
 
         self.vel_counter = None
         self.accel_velocity = None
@@ -282,5 +283,6 @@ class SurfaceMap:
 
 
 if __name__ == '__main__':
-    adapt = SurfaceMap(None, debug=True)
-    adapt.debug()
+    client = Client()
+    robot = YouBot('192.168.88.21', ros=True, offline=False, camera_enable=True, advanced=False, ssh=False)
+    adapt = SurfaceMap(robot, client)
