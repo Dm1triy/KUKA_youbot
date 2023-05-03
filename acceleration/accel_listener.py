@@ -24,6 +24,7 @@ class Accel:
         # self.run_stream()
 
     def __del__(self):
+        print("(Serial):\n    Stream is shout down!\n")
         if self.ser:
             self.ser.close()
 
@@ -46,7 +47,8 @@ class Accel:
 
             line = self.ser.readline()
             if line[0] != 88:
-                print(str(line, "utf-8"))
+                if self.info:
+                    print(str(line, "utf-8"))
                 continue
             accel = list(map(float, line.strip().split()[1::2]))
             if self.info:
@@ -56,8 +58,6 @@ class Accel:
             self.is_data_available = True
             self.lock.release()
 
-        print("(Serial):\n    Stream is shout down!\n")
-
     def wait_until_data(self, period=0.1):
         start_time = time.time()
         time_ceiling = start_time + self.timeout
@@ -65,7 +65,7 @@ class Accel:
             get_time = time.time()
             if self.ser.in_waiting:
                 if self.info:
-                    print(f"Data is ready! get_time: {get_time} \nperiod {get_time-start_time}")
+                    print(f"(Serial):\n    Data is ready! get_time: {get_time}    period {get_time-start_time}")
                 return True, get_time-start_time, get_time
             time.sleep(period)
         print(f"(Serial):\n    Timeout {self.port}\n")
@@ -82,12 +82,6 @@ class Accel:
 
 
 if __name__ == "__main__":
-    test = Accel()
-    if not test.is_connected:
-        del test
+    test = Accel(info=True)
 
-    while True:
-        t = test.get_data()
-        if t:
-            print(t)
 

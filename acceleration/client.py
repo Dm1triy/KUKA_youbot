@@ -15,14 +15,15 @@ class Client:
         while True:
             try:
                 self.client_socket.connect((self.host, self.port))
-            except socket.error as e:
+                break
+            except socket.error:
                 if self.connected:
-                    print("Cant connect to the accel server")
+                    print("(Client)\n    Server is down")
                     self.connected = False
+                time.sleep(2)
                 continue
 
         self.connected = True
-
         print("(Client)\n    Connected to the server!")
 
         self.latest_data = None
@@ -32,12 +33,15 @@ class Client:
         self.recdata_thr = thr.Thread(target=self.interaction, args=())
         self.recdata_thr.start()
 
+        self.calibration_weight = (0, 0)
+        self.calibration_data = [[0], [0]]
         self.velocity = 0
         self.vel_proj = (0, 0)
         self.vel_updated = False
 
         self.vel_lock = thr.Lock()
         self.vel_thr = thr.Thread(target=self.velocity_stream, args=())
+        print("(Client)\n    Calibration ...")
         self.vel_thr.start()
 
     def __del__(self):
@@ -61,7 +65,7 @@ class Client:
             self.is_data_available = True
             self.recdata_lock.release()
 
-    def velocity_stream(self):
+    def velocity_stream(self, calibration_time=30):
         while True:
             if not self.is_data_available:
                 time.sleep(0.05)
@@ -71,6 +75,17 @@ class Client:
             period = self.latest_data[1]
             rec_time = self.latest_data[2]
             acc_x, acc_y = self.latest_data[0][0], self.latest_data[0][1]
+
+            if len(self.calibration_data[0]) < calibration_time:
+                self.calibration_data[0].append(acc_x)
+                self.calibration_data[1].append(acc_y)
+                if len(self.calibration_data[0]) == calibration_time:
+                    self.calibration_weight = np.mean(self.calibration_data[0][1:]), \
+                                              np.mean(self.calibration_data[1][1:])
+                else:
+                    continue
+
+            acc_x, acc_y = acc_x - self.calibration_weight[0], acc_y - self.calibration_weight[1]
 
             vel_x = self.vel_proj[0] + acc_x * period
             vel_y = self.vel_proj[1] + acc_y * period
@@ -92,4 +107,8 @@ class Client:
 
 
 if __name__ == "__main__":
-    pc = Client()
+    pc = Client(host=socket.gethostname(), info=False)
+
+    while True:
+        vel = pc.get_velocity()
+        print(vel)
