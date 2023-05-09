@@ -7,64 +7,6 @@ from acceleration.client import Client
 from KUKA.KUKA import YouBot
 
 
-class ForwardKinematics:
-    def __init__(self, robot, debug=False):
-        # arm_base is manipulator pos if x=0, y=0 are the coords of the robot's center and z=0 is ground
-        self.arm_base = 0, 0.18, 0.3
-        self.link_len = [0.16, 0.14, 0.11]  # m2_len, m3_len, m4_len in meters
-        self.robot = robot
-        self.debug = debug
-
-        if not self.debug:
-            self.angles = self.robot.arm  # 5 angles of 1-5 links in radiansу
-        else:
-            self.angles = self.read_angs_from_log()
-
-    def update_arm(self):
-        self.angles = self.robot.arm
-
-    @staticmethod
-    def read_angs_from_log(path='debug/armpos.txt'):
-        path = path
-        f = open(path, "r")
-        angles = list(map(float, f.read().split(' ')))
-        f.close()
-        return angles
-
-    def get_cam_pos(self):
-        """
-        calculates the position of the camera relative to the center of the robot
-        :return:
-        """
-        # clockwise rotation is described by the following matrix
-        #   |cos(x)  -sin(x) ...|                                       |cos(x)  sin(x) ...|
-        #   |sin(x) cos(x)      | and counterclockwise rotation by the  |-sin(x) cos(x)    |
-        # theta is positive when rotation is clockwise
-        theta = self.angles[0]
-        theta = np.radians(theta)
-        # rotation of the 1 link around z-axis
-        affine_mat = np.array([[np.cos(theta), -np.sin(theta), 0, 0],
-                               [np.sin(theta), np.cos(theta),  0, 0],
-                               [0,             0,              1, self.link_len[0]],
-                               [0,             0,              0, 1]])
-        for i in range(len(self.link_len)-1):
-            theta = np.radians(self.angles[i+1])
-
-            # rotation around x-axis and z-offset
-            link_mat = np.array([[1, 0,             0,              0],
-                                 [0, np.cos(theta), -np.sin(theta), 0],
-                                 [0, np.sin(theta), np.cos(theta),  self.link_len[i+1]],
-                                 [0, 0,             0,              1]])
-            affine_mat = np.matmul(affine_mat, link_mat)
-
-        pos_mat = self.arm_base + (1,)  # [x, y, z, 1]
-        pos_mat = np.array(pos_mat).reshape(-1, 1)  # transpose
-        cam_pos = np.matmul(affine_mat, pos_mat)[:-1].reshape(-1)   # [x_new, y_new, z_new]
-        ang = abs(90 + sum(self.angles[1:4]))
-        cam_pos = np.append(cam_pos, ang)
-        return cam_pos  # x, y, z, theta
-
-
 class SurfaceMap:
     def __init__(self, robot, client, debug=False):
         self.robot = robot
@@ -79,6 +21,8 @@ class SurfaceMap:
         self.map_height = 501
         self.surface_map = np.array([[[100, 100, 100]] * self.map_width] * self.map_height, dtype=np.uint8)
         self.start_x, self.start_y = self.map_width//2, self.map_height//2
+
+        self.weighted_map = np.array([0 * self.map_width] * self.map_height, dtype=np.uint8)
 
         # camera params
         self.vert_FoV = np.radians(40)
@@ -96,8 +40,9 @@ class SurfaceMap:
             self.angles = self.robot.arm
             self.robot_pos, _ = self.robot.lidar
             self.running = True
-            vel_thr = thr.Thread(target=self.update_velocity, args=())
-            vel_thr.start()
+            self.vel_thr = thr.Thread(target=self.update_map, args=())
+            self.vel_lock = thr.Lock()
+            self.vel_thr.start()
         else:
             self.floor_img = self.get_img_from_log()
             self.angles = self.get_angs_from_log()
@@ -107,15 +52,32 @@ class SurfaceMap:
         self.arm_pos = cam_coords[:3]
         self.arm_angle = np.radians(cam_coords[-1])
 
-    def update_velocity(self):
+    def update_map(self):
         while self.running:
+            # Get velocities and pos
             self.accel_velocity = self.client.get_velocity()    # absolute velocity
             while self.vel_counter == self.robot.odom_speed_counter:
-                time.sleep(0.05)
-            self.vel_counter = self.robot.odom_speed_counter
+                time.sleep(0.02)
             self.odom_velocity = self.robot.odom_speed_data     # Vx, Vy, rotation
+            pos, _ = self.robot.lidar
+            self.vel_counter = self.robot.odom_speed_counter
+
             abs_vel_odom = np.linalg.norm([self.odom_velocity[0], self.odom_velocity[1]])
             print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
+
+            # get and then check color
+            surf_weight = (1 + self.odom_velocity)/(1+self.accel_velocity)
+            map_x, map_y = self.pos_to_cell(pos[0], pos[1])
+            self.vel_lock.acquire()
+            surf_color = self.surface_map[map_y, map_x]
+            self.vel_lock.release()
+            if surf_color == [100, 100, 100]:
+                continue
+
+            self.apply_weight2color(surf_weight, surf_color)
+
+
+
 
     def create_surface_map(self):
         while self.running:
@@ -153,6 +115,20 @@ class SurfaceMap:
         local_map = self.map_from_img(transformed_img, floor_dims)
         self.update_surf_map(local_map)
         display_img(self.surface_map)
+
+    def apply_weight2color(self, weight, color):
+        from itertools import product
+
+        surf_weight = weight
+        surf_color = cv.cvtColor(color, cv.COLOR_BGR2HSV)
+        color_ceiling = surf_color[0] + 0.1
+        color_floor = surf_color[0] - 0.1
+
+        iter_i, iter_j = range(self.surface_map.shape[0]), range(self.surface_map.shape[1])
+        for i, j in product(iter_i, iter_j):
+            check_color = cv.cvtColor(self.surface_map[j, i], cv.COLOR_BGR2HSV)
+            if color_floor < check_color[0] < color_ceiling and check_color[1] > 0.2:
+                self.weighted_map[j, i] = surf_weight
 
     def forward_kinematics(self):
         """
@@ -286,3 +262,61 @@ if __name__ == '__main__':
     client = Client()
     robot = YouBot('192.168.88.21', ros=True, offline=False, camera_enable=True, advanced=False, ssh=False)
     adapt = SurfaceMap(robot, client)
+
+
+# class ForwardKinematics:
+#     def __init__(self, robot, debug=False):
+#         # arm_base is manipulator pos if x=0, y=0 are the coords of the robot's center and z=0 is ground
+#         self.arm_base = 0, 0.18, 0.3
+#         self.link_len = [0.16, 0.14, 0.11]  # m2_len, m3_len, m4_len in meters
+#         self.robot = robot
+#         self.debug = debug
+#
+#         if not self.debug:
+#             self.angles = self.robot.arm  # 5 angles of 1-5 links in radiansу
+#         else:
+#             self.angles = self.read_angs_from_log()
+#
+#     def update_arm(self):
+#         self.angles = self.robot.arm
+#
+#     @staticmethod
+#     def read_angs_from_log(path='debug/armpos.txt'):
+#         path = path
+#         f = open(path, "r")
+#         angles = list(map(float, f.read().split(' ')))
+#         f.close()
+#         return angles
+#
+#     def get_cam_pos(self):
+#         """
+#         calculates the position of the camera relative to the center of the robot
+#         :return:
+#         """
+#         # clockwise rotation is described by the following matrix
+#         #   |cos(x)  -sin(x) ...|                                       |cos(x)  sin(x) ...|
+#         #   |sin(x) cos(x)      | and counterclockwise rotation by the  |-sin(x) cos(x)    |
+#         # theta is positive when rotation is clockwise
+#         theta = self.angles[0]
+#         theta = np.radians(theta)
+#         # rotation of the 1 link around z-axis
+#         affine_mat = np.array([[np.cos(theta), -np.sin(theta), 0, 0],
+#                                [np.sin(theta), np.cos(theta),  0, 0],
+#                                [0,             0,              1, self.link_len[0]],
+#                                [0,             0,              0, 1]])
+#         for i in range(len(self.link_len)-1):
+#             theta = np.radians(self.angles[i+1])
+#
+#             # rotation around x-axis and z-offset
+#             link_mat = np.array([[1, 0,             0,              0],
+#                                  [0, np.cos(theta), -np.sin(theta), 0],
+#                                  [0, np.sin(theta), np.cos(theta),  self.link_len[i+1]],
+#                                  [0, 0,             0,              1]])
+#             affine_mat = np.matmul(affine_mat, link_mat)
+#
+#         pos_mat = self.arm_base + (1,)  # [x, y, z, 1]
+#         pos_mat = np.array(pos_mat).reshape(-1, 1)  # transpose
+#         cam_pos = np.matmul(affine_mat, pos_mat)[:-1].reshape(-1)   # [x_new, y_new, z_new]
+#         ang = abs(90 + sum(self.angles[1:4]))
+#         cam_pos = np.append(cam_pos, ang)
+#         return cam_pos  # x, y, z, theta
