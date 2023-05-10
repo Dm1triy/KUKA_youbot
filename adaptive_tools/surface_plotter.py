@@ -36,7 +36,7 @@ class SurfaceMap:
 
         if robot:
             # robot values in the moment
-            self.floor_img = robot.camera_BGR()
+            self.floor_img = self.robot.camera()
             self.angles = self.robot.arm
             self.robot_pos, _ = self.robot.lidar
             self.running = True
@@ -65,24 +65,21 @@ class SurfaceMap:
             abs_vel_odom = np.linalg.norm([self.odom_velocity[0], self.odom_velocity[1]])
             print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
 
-            # get and then check color
-            surf_weight = (1 + self.odom_velocity)/(1+self.accel_velocity)
+            # get and check color
+            surf_weight = (1 + abs_vel_odom)/(1+self.accel_velocity)
+            print(surf_weight)
+
             map_x, map_y = self.pos_to_cell(pos[0], pos[1])
             self.vel_lock.acquire()
-            surf_color = self.surface_map[map_y, map_x]
+            hsv_map = cv.cvtColor(self.surface_map, cv.COLOR_RGB2HSV)
             self.vel_lock.release()
-            if surf_color == [100, 100, 100]:
-                continue
 
-            self.apply_weight2color(surf_weight, surf_color)
-
-
-
+            self.update_weights(surf_weight, hsv_map, (map_x, map_y))
 
     def create_surface_map(self):
         while self.running:
             self.running = cv.waitKey(40) != 27
-            self.floor_img = self.robot.camera_BGR()
+            self.floor_img = self.robot.camera()
             self.angles = self.robot.arm
             self.robot_pos, _ = self.robot.lidar
 
@@ -98,6 +95,15 @@ class SurfaceMap:
                 img = cv.resize(self.surface_map, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
                 cv.imshow("map", img)
             time.sleep(1)
+
+    def update_weights(self, weight, hsv_map, pos):
+        pixel = hsv_map[pos[1], pos[0]]
+
+        lower_bound = np.array([pixel[0]-10, 45, 45])
+        upper_bound = np.array([pixel[0]+10, 255, 255])
+
+        mask = cv.inRange(hsv_map, lower_bound, upper_bound)
+        self.weighted_map = self.weighted_map + weight*mask/255
 
     def debug(self):
         def display_img(img, size=(500, 500)):
@@ -115,20 +121,6 @@ class SurfaceMap:
         local_map = self.map_from_img(transformed_img, floor_dims)
         self.update_surf_map(local_map)
         display_img(self.surface_map)
-
-    def apply_weight2color(self, weight, color):
-        from itertools import product
-
-        surf_weight = weight
-        surf_color = cv.cvtColor(color, cv.COLOR_BGR2HSV)
-        color_ceiling = surf_color[0] + 0.1
-        color_floor = surf_color[0] - 0.1
-
-        iter_i, iter_j = range(self.surface_map.shape[0]), range(self.surface_map.shape[1])
-        for i, j in product(iter_i, iter_j):
-            check_color = cv.cvtColor(self.surface_map[j, i], cv.COLOR_BGR2HSV)
-            if color_floor < check_color[0] < color_ceiling and check_color[1] > 0.2:
-                self.weighted_map[j, i] = surf_weight
 
     def forward_kinematics(self):
         """
@@ -243,25 +235,87 @@ class SurfaceMap:
     def pos_to_cell(self, x, y):
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
 
+
+class Robotdebug:
+    def __init__(self):
+        path2img = '/home/kpu/dev/__/KUKA_youbot_latest/debug/floor.jpg'
+        path2angs = '/home/kpu/dev/__/KUKA_youbot_latest/debug/armpos.txt'
+
+        img = self.get_img_from_log(path2img)
+        self.img = self.transform_img(img)
+        self.angs = self.get_angs_from_log(path2angs)
+        self.pos = [0.5, 0.5, np.radians(30)]
+        self.speed = [0.5, 0.5, 0.5]
+
+        self.odom_speed_counter = 0
+
+    @property
+    def odom_speed_data(self):
+        self.odom_speed_counter += 1
+        return self.speed
+
+    @property
+    def arm(self):
+        return self.angs
+
+    @property
+    def lidar(self):
+        return self.pos, None
+
+    def camera(self):
+        return self.img
+
     @staticmethod
-    def get_img_from_log(path='/home/kpu/dev/__/KUKA_youbot0/debug/floor.jpg'):
-        img = cv.imread(path)
+    def get_img_from_log(path):
+        img = cv.imread(path)                   # default imread color space is BGR
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         return img
 
     @staticmethod
-    def get_angs_from_log(path='/home/kpu/dev/__/KUKA_youbot0/debug/armpos.txt'):
+    def get_angs_from_log(path):
         path = path
         f = open(path, "r")
         angles = list(map(float, f.read().split(' ')))
         f.close()
         return angles
 
+    @staticmethod
+    def transform_img(img):
+        new_img = img
+        # color = np.array([0, 0, 255]).reshape(1, 1, 3)      # RGB
+        # color = cv.cvtColor(color, cv.COLOR_BGR2RGB)
+        # print(color)
+        cv.rectangle(new_img, pt1=(200, 200), pt2=(300, 300), color=(0, 0, 255), thickness=-1)
+        return new_img
+
+    def display_img(self):
+        cv.imshow('Floor', self.img)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+
+
+class Clientdebug:
+    def __init__(self):
+        self.velocity = 0.4
+
+    def get_velocity(self):
+        return self.velocity
+
 
 if __name__ == '__main__':
-    client = Client()
-    robot = YouBot('192.168.88.21', ros=True, offline=False, camera_enable=True, advanced=False, ssh=False)
-    adapt = SurfaceMap(robot, client)
+    # client = Client()
+    # robot = YouBot('192.168.88.21', ros=True, offline=False, camera_enable=True, advanced=False, ssh=False)
+    # adapt = SurfaceMap(robot, client)
+
+    robot = Robotdebug()
+    robot.display_img()
+    client = Clientdebug()
+    adaptive_map = SurfaceMap(robot, client)
+    adaptive_map.create_surface_map()
+
+
+
+
 
 
 # class ForwardKinematics:
