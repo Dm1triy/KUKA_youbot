@@ -66,6 +66,7 @@ class Client:
 
     def velocity_stream(self, calibration_time=30):
         acc_x, acc_y = 0, 0
+        counter = 0
         while True:
             if not self.is_data_available:
                 time.sleep(0.05)
@@ -77,7 +78,7 @@ class Client:
             raw_acc = self.latest_data[0][0], self.latest_data[0][1]
 
             if len(self.calibration_data[0]) < calibration_time:
-                print(len(self.calibration_data[0]))
+                # print(len(self.calibration_data[0]))
                 self.calibration_data[0].append(raw_acc[0])
                 self.calibration_data[1].append(raw_acc[1])
                 if len(self.calibration_data[0]) == calibration_time:
@@ -100,14 +101,22 @@ class Client:
 
             acc_x, acc_y = self.filter_acc(raw_acc, (acc_x, acc_y))
             # print(acc_x, acc_y)
-            if abs(acc_x) < 0.04:
+            if abs(acc_x) < 0.05:
                 acc_x = 0
-            if abs(acc_y) < 0.04:
+            if abs(acc_y) < 0.05:
                 acc_y = 0
-            print("                                                 ", acc_x, acc_y)
+            # print("                                                 ", acc_x, acc_y)
 
             vel_x = self.vel_proj[0] + acc_x * period
             vel_y = self.vel_proj[1] + acc_y * period
+            vel_x, vel_y = self.filter_acc((vel_x, vel_y), self.vel_proj, k=0.5)
+
+            if abs(acc_x) < 0.1 and abs(acc_y) < 0.1:
+                counter += 1
+                if counter == 3:
+                    vel_x, vel_y = 0, 0
+            else:
+                counter = 0
 
             velocity = np.linalg.norm([vel_x, vel_y])
 

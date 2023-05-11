@@ -58,7 +58,8 @@ class SurfaceMap:
             self.accel_velocity = self.client.get_velocity()    # absolute velocity
             while self.vel_counter == self.robot.odom_speed_counter:
                 time.sleep(0.02)
-            self.odom_velocity = self.robot.odom_speed_data     # Vx, Vy, rotation
+            self.odom_velocity = self.robot.move_speed     # Vx, Vy, rotation
+            print(self.odom_velocity)
             pos, _ = self.robot.lidar
             self.vel_counter = self.robot.odom_speed_counter
 
