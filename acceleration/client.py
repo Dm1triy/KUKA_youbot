@@ -1,4 +1,5 @@
 import socket
+import sys
 import time
 import threading as thr
 import numpy as np
@@ -12,16 +13,13 @@ class Client:
 
         self.client_socket = socket.socket()
         self.connected = True
-        while True:
-            try:
-                self.client_socket.connect((self.host, self.port))
-                break
-            except socket.error:
-                if self.connected:
-                    print("(Client)\n    Server is down")
-                    self.connected = False
-                time.sleep(2)
-                continue
+        try:
+            self.client_socket.connect((self.host, self.port))
+        except socket.error:
+            if self.connected:
+                print("(Client)\n    Server is down")
+                self.connected = False
+            sys.exit(1)
 
         self.connected = True
         print("(Client)\n    Connected to the server!")
@@ -45,7 +43,8 @@ class Client:
         self.vel_thr.start()
 
     def __del__(self):
-        self.client_socket.sendall(b"Stop")
+        if self.connected:
+            self.client_socket.sendall(b"Stop")
         self.client_socket.close()
         print("(Client)\n    Connection lost")
 
@@ -66,6 +65,7 @@ class Client:
             self.recdata_lock.release()
 
     def velocity_stream(self, calibration_time=30):
+        acc_x, acc_y = 0, 0
         while True:
             if not self.is_data_available:
                 time.sleep(0.05)
@@ -74,18 +74,37 @@ class Client:
 
             period = self.latest_data[1]
             rec_time = self.latest_data[2]
-            acc_x, acc_y = self.latest_data[0][0], self.latest_data[0][1]
+            raw_acc = self.latest_data[0][0], self.latest_data[0][1]
 
             if len(self.calibration_data[0]) < calibration_time:
-                self.calibration_data[0].append(acc_x)
-                self.calibration_data[1].append(acc_y)
+                print(len(self.calibration_data[0]))
+                self.calibration_data[0].append(raw_acc[0])
+                self.calibration_data[1].append(raw_acc[1])
                 if len(self.calibration_data[0]) == calibration_time:
-                    self.calibration_weight = np.mean(self.calibration_data[0][1:]), \
-                                              np.mean(self.calibration_data[1][1:])
+
+                    weight1 = np.quantile(self.calibration_data[0][2:], 0.2), \
+                              np.quantile(self.calibration_data[1][2:], 0.2)
+                    weight2 = np.quantile(self.calibration_data[0][2:], 0.4), \
+                              np.quantile(self.calibration_data[1][2:], 0.4)
+                    weight3 = np.quantile(self.calibration_data[0][2:], 0.6), \
+                              np.quantile(self.calibration_data[1][2:], 0.6)
+                    weight4 = np.quantile(self.calibration_data[0][2:], 0.8), \
+                              np.quantile(self.calibration_data[1][2:], 0.8)
+
+                    self.calibration_weight = (weight1[0] + weight2[0] + weight3[0] + weight4[0])/4, \
+                                              (weight1[1] + weight2[1] + weight3[1] + weight4[1])/4
                 else:
                     continue
 
-            acc_x, acc_y = acc_x - self.calibration_weight[0], acc_y - self.calibration_weight[1]
+            raw_acc = raw_acc[0] - self.calibration_weight[0], raw_acc[1] - self.calibration_weight[1]
+
+            acc_x, acc_y = self.filter_acc(raw_acc, (acc_x, acc_y))
+            # print(acc_x, acc_y)
+            if abs(acc_x) < 0.04:
+                acc_x = 0
+            if abs(acc_y) < 0.04:
+                acc_y = 0
+            print("                                                 ", acc_x, acc_y)
 
             vel_x = self.vel_proj[0] + acc_x * period
             vel_y = self.vel_proj[1] + acc_y * period
@@ -97,6 +116,11 @@ class Client:
                 self.velocity = velocity
                 self.vel_updated = True
 
+    @staticmethod
+    def filter_acc(acc_raw, acc_opt, k=0.7):
+        acc_x, acc_y = k * acc_raw[0] + (1 - k) * acc_opt[0], k * acc_raw[1] + (1-k) * acc_opt[1]
+        return acc_x, acc_y
+
     def get_velocity(self):
         while not self.vel_updated:
             time.sleep(0.05)
@@ -107,7 +131,7 @@ class Client:
 
 
 if __name__ == "__main__":
-    pc = Client(host=socket.gethostname(), info=False)
+    pc = Client(host='192.168.88.24', info=False)
 
     while True:
         vel = pc.get_velocity()

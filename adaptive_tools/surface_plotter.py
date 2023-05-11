@@ -63,6 +63,8 @@ class SurfaceMap:
             self.vel_counter = self.robot.odom_speed_counter
 
             abs_vel_odom = np.linalg.norm([self.odom_velocity[0], self.odom_velocity[1]])
+            if self.accel_velocity < 0.05:
+                self.accel_velocity = 0.0
             print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
 
             # get and check color
@@ -193,7 +195,8 @@ class SurfaceMap:
         floor_size = map_size
         map_width, map_height = int(floor_size[0] / self.cell_size), int(floor_size[1] / self.cell_size)
         scale_x, scale_y = img.shape[0] // map_width, img.shape[1] // map_height
-        local_map = skimage.measure.block_reduce(img, (scale_y, scale_x, 1), np.max)
+        if img.shape[0] > 0:
+            local_map = skimage.measure.block_reduce(img, (scale_y, scale_x, 1), np.max)
         return local_map
 
     def update_surf_map(self, local_map):
