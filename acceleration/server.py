@@ -55,7 +55,7 @@ class Server:
                     print(f"    {msg}")
                 self.conn.sendall(str.encode(msg))
                 continue
-            if data == "Stop":
+            if data == "Stop" or not data:
                 self.server_is_running = False
                 return
 

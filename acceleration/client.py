@@ -75,7 +75,7 @@ class Client:
 
             period = self.latest_data[1]
             rec_time = self.latest_data[2]
-            raw_acc = self.latest_data[0][0], self.latest_data[0][1]
+            raw_acc = self.latest_data[0][0],  self.latest_data[0][1]
 
             if len(self.calibration_data[0]) < calibration_time:
                 # print(len(self.calibration_data[0]))
@@ -101,11 +101,11 @@ class Client:
 
             acc_x, acc_y = self.filter_acc(raw_acc, (acc_x, acc_y))
             # print(acc_x, acc_y)
-            if abs(acc_x) < 0.05:
+            if abs(acc_x) < 0.095:
                 acc_x = 0
-            if abs(acc_y) < 0.05:
+            if abs(acc_y) < 0.095:
                 acc_y = 0
-            # print("                                                 ", acc_x, acc_y)
+            print("                                                 Accel:", acc_x, acc_y)
 
             vel_x = self.vel_proj[0] + acc_x * period
             vel_y = self.vel_proj[1] + acc_y * period
@@ -113,8 +113,9 @@ class Client:
 
             if abs(acc_x) < 0.1 and abs(acc_y) < 0.1:
                 counter += 1
-                if counter == 3:
+                if counter == 2:
                     vel_x, vel_y = 0, 0
+                    counter = 0
             else:
                 counter = 0
 
@@ -126,7 +127,7 @@ class Client:
                 self.vel_updated = True
 
     @staticmethod
-    def filter_acc(acc_raw, acc_opt, k=0.7):
+    def filter_acc(acc_raw, acc_opt, k=0.8):
         acc_x, acc_y = k * acc_raw[0] + (1 - k) * acc_opt[0], k * acc_raw[1] + (1-k) * acc_opt[1]
         return acc_x, acc_y
 

@@ -17,8 +17,8 @@ class SurfaceMap:
         self.odom_velocity = None
 
         self.cell_size = 0.05   # meters
-        self.map_width = 501
-        self.map_height = 501
+        self.map_width = 401
+        self.map_height = 401
         self.surface_map = np.array([[[100, 100, 100]] * self.map_width] * self.map_height, dtype=np.uint8)
         self.start_x, self.start_y = self.map_width//2, self.map_height//2
 
@@ -52,30 +52,30 @@ class SurfaceMap:
         self.arm_pos = cam_coords[:3]
         self.arm_angle = np.radians(cam_coords[-1])
 
-    def update_map(self):
+    def update_map(self, naebka=True):
         while self.running:
             # Get velocities and pos
             self.accel_velocity = self.client.get_velocity()    # absolute velocity
             while self.vel_counter == self.robot.odom_speed_counter:
                 time.sleep(0.02)
             self.odom_velocity = self.robot.move_speed     # Vx, Vy, rotation
-            print(self.odom_velocity)
             pos, _ = self.robot.lidar
             self.vel_counter = self.robot.odom_speed_counter
-
-            abs_vel_odom = np.linalg.norm([self.odom_velocity[0], self.odom_velocity[1]])
-            if self.accel_velocity < 0.05:
-                self.accel_velocity = 0.0
-            print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
-
-            # get and check color
-            surf_weight = (1 + abs_vel_odom)/(1+self.accel_velocity)
-            print(surf_weight)
 
             map_x, map_y = self.pos_to_cell(pos[0], pos[1])
             self.vel_lock.acquire()
             hsv_map = cv.cvtColor(self.surface_map, cv.COLOR_RGB2HSV)
             self.vel_lock.release()
+
+            abs_vel_odom = np.linalg.norm([2*self.odom_velocity[0], 2*self.odom_velocity[1]])
+            if naebka:
+                self.accel_velocity = self.process_vel(abs_vel_odom, (map_x, map_y), hsv_map)
+
+            print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
+
+            # get and check color
+            surf_weight = (1 + abs_vel_odom)/(1+self.accel_velocity)
+            print('Mobility weight =', surf_weight)
 
             self.update_weights(surf_weight, hsv_map, (map_x, map_y))
 
@@ -95,18 +95,39 @@ class SurfaceMap:
                 floor_dims = self.get_floor_sizes()
                 local_map = self.map_from_img(transformed_img, floor_dims)
                 self.update_surf_map(local_map)
-                img = cv.resize(self.surface_map, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
+                map_with_robot = self.surface_map
+                robot_x, robot_y = self.pos_to_cell(self.robot_pos[0], self.robot_pos[1])
+                map_with_robot = cv.circle(map_with_robot, (robot_x, robot_y), 2, [255, 0, 0], 2)
+                img = cv.resize(map_with_robot, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
                 cv.imshow("map", img)
             time.sleep(1)
 
     def update_weights(self, weight, hsv_map, pos):
         pixel = hsv_map[pos[1], pos[0]]
+        print("                 Color", hsv_map[pos[1], pos[0]])
 
         lower_bound = np.array([pixel[0]-10, 45, 45])
         upper_bound = np.array([pixel[0]+10, 255, 255])
 
         mask = cv.inRange(hsv_map, lower_bound, upper_bound)
         self.weighted_map = self.weighted_map + weight*mask/255
+
+    def process_vel(self, vel, pos, hsv):
+        v = np.random.normal(vel, 0.1)
+        target_v = np.random.normal(0.7, 0.05)
+        target = 170
+        l_t = np.array([target-10, 45, 45])
+        u_t = np.array([target+10, 255, 255])
+        threshold = cv.inRange(hsv, l_t, u_t)
+        flag = threshold[pos[1], pos[0]]
+        print(np.max(threshold))
+        # img = cv.resize(threshold, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
+        # cv.imshow("mask", img)
+
+        if flag:
+            return target_v
+        else:
+            return v
 
     def debug(self):
         def display_img(img, size=(500, 500)):
@@ -123,7 +144,11 @@ class SurfaceMap:
         floor_dims = self.get_floor_sizes()
         local_map = self.map_from_img(transformed_img, floor_dims)
         self.update_surf_map(local_map)
-        display_img(self.surface_map)
+
+        map_with_robot = self.surface_map
+        robot_x, robot_y = self.pos_to_cell(self.robot_pos[0], self.robot_pos[1])
+        map_with_robot = cv.circle(map_with_robot, (robot_x, robot_y), 5, [255, 0, 0], 5)
+        display_img(map_with_robot)
 
     def forward_kinematics(self):
         """
@@ -204,7 +229,7 @@ class SurfaceMap:
         from itertools import product
 
         robot_x, robot_y = self.pos_to_cell(self.robot_pos[0], self.robot_pos[1])
-        robot_ang = self.robot_pos[2]
+        robot_ang = -self.robot_pos[2]
         arm_len = np.linalg.norm([self.arm_pos[0], self.arm_pos[1]])
         arm_x, arm_y = robot_x + (arm_len / self.cell_size) * np.cos(self.arm_angle), \
                        robot_y + (arm_len / self.cell_size) * np.sin(self.arm_angle)
@@ -230,11 +255,7 @@ class SurfaceMap:
         self.surface_map = cv.medianBlur(self.surface_map, 3)
 
         self.surface_map[self.start_y, self.start_x] = [0, 0, 0]
-        self.surface_map[robot_y, robot_x] = [255, 0, 0]
-        self.surface_map = cv.circle(self.surface_map, (robot_x, robot_y), 5, [255, 0, 0], 5)
-        # self.surface_map[arm_y, arm_x] = [255, 0, 0]
         self.surface_map[img_edge_y, img_edge_x] = [255, 0, 0]
-        # Putting text
 
     def pos_to_cell(self, x, y):
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
