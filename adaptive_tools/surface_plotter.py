@@ -22,7 +22,7 @@ class SurfaceMap:
         self.surface_map = np.array([[[100, 100, 100]] * self.map_width] * self.map_height, dtype=np.uint8)
         self.start_x, self.start_y = self.map_width//2, self.map_height//2
 
-        self.weighted_map = np.array([0 * self.map_width] * self.map_height, dtype=np.uint8)
+        self.weighted_map = np.array([1 * self.map_width] * self.map_height, dtype=np.uint8)
 
         # camera params
         self.vert_FoV = np.radians(40)
@@ -33,6 +33,8 @@ class SurfaceMap:
         self.link_len = [0.16, 0.14, 0.11]  # m2_len, m3_len, m4_len in meters
         # arm_base is manipulator pos if x=0, y=0 are the coords of the robot's center and z=0 is ground
         self.arm_base = 0, 0.18, 0.3
+
+        self.mask = None
 
         if robot:
             # robot values in the moment
@@ -69,7 +71,7 @@ class SurfaceMap:
 
             abs_vel_odom = np.linalg.norm([2*self.odom_velocity[0], 2*self.odom_velocity[1]])
             if naebka:
-                self.accel_velocity = self.process_vel(abs_vel_odom, (map_x, map_y), hsv_map)
+                self.accel_velocity, abs_vel_odom = self.process_vel(abs_vel_odom, (map_x, map_y), hsv_map)
 
             print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
 
@@ -95,18 +97,21 @@ class SurfaceMap:
                 floor_dims = self.get_floor_sizes()
                 local_map = self.map_from_img(transformed_img, floor_dims)
                 self.update_surf_map(local_map)
-                map_with_robot = self.surface_map
+                map_with_robot = np.array(self.surface_map, copy=True)
                 robot_x, robot_y = self.pos_to_cell(self.robot_pos[0], self.robot_pos[1])
                 map_with_robot = cv.circle(map_with_robot, (robot_x, robot_y), 2, [255, 0, 0], 2)
                 img = cv.resize(map_with_robot, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
                 cv.imshow("map", img)
+                # img2 = cv.resize(self.mask, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
+                # if self.mask is not None:
+                #     cv.imshow("mask", self.mask)
             time.sleep(1)
 
     def update_weights(self, weight, hsv_map, pos):
         pixel = hsv_map[pos[1], pos[0]]
         print("                 Color", hsv_map[pos[1], pos[0]])
 
-        lower_bound = np.array([pixel[0]-10, 45, 45])
+        lower_bound = np.array([pixel[0]-10, 60, 60])
         upper_bound = np.array([pixel[0]+10, 255, 255])
 
         mask = cv.inRange(hsv_map, lower_bound, upper_bound)
@@ -114,20 +119,19 @@ class SurfaceMap:
 
     def process_vel(self, vel, pos, hsv):
         v = np.random.normal(vel, 0.1)
-        target_v = np.random.normal(0.7, 0.05)
-        target = 170
-        l_t = np.array([target-10, 45, 45])
-        u_t = np.array([target+10, 255, 255])
+        target_v = np.random.normal(0.3, 0.05)
+        purp = 170
+        orng = 110
+        l_t = np.array([orng-10, 60, 60])
+        u_t = np.array([orng+10, 255, 255])
         threshold = cv.inRange(hsv, l_t, u_t)
         flag = threshold[pos[1], pos[0]]
-        print(np.max(threshold))
-        # img = cv.resize(threshold, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
-        # cv.imshow("mask", img)
+        self.mask = threshold
 
         if flag:
-            return target_v
+            return target_v, 1
         else:
-            return v
+            return v, vel
 
     def debug(self):
         def display_img(img, size=(500, 500)):
@@ -145,7 +149,7 @@ class SurfaceMap:
         local_map = self.map_from_img(transformed_img, floor_dims)
         self.update_surf_map(local_map)
 
-        map_with_robot = self.surface_map
+        map_with_robot = np.array(self.surface_map, copy=True)
         robot_x, robot_y = self.pos_to_cell(self.robot_pos[0], self.robot_pos[1])
         map_with_robot = cv.circle(map_with_robot, (robot_x, robot_y), 5, [255, 0, 0], 5)
         display_img(map_with_robot)
@@ -250,15 +254,22 @@ class SurfaceMap:
                              (local_map.shape[1]//2) * np.sin(robot_ang)
             new_i = np.around(img_edge_x + new_i + diff_i).astype(int)
             new_j = np.around(img_edge_y + new_j - diff_j).astype(int)
-            self.surface_map[new_j, new_i] = local_map[-i, j]
+            if (self.surface_map[new_j, new_i] == [100, 100, 100]).all() or \
+            (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
+            # dist = np.linalg.norm([robot_x-new_i, robot_y-new_j])
+            # if dist > 20 or (self.surface_map[new_j, new_i] == [100, 100, 100]).all():
+                self.surface_map[new_j, new_i] = local_map[-i, j]
 
         self.surface_map = cv.medianBlur(self.surface_map, 3)
 
-        self.surface_map[self.start_y, self.start_x] = [0, 0, 0]
-        self.surface_map[img_edge_y, img_edge_x] = [255, 0, 0]
-
     def pos_to_cell(self, x, y):
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
+
+    def get_weighted_map(self):
+        return self.weighted_map
+
+    def get_weight(self, x, y):
+        return self.weighted_map[y, x]
 
 
 class Robotdebug:

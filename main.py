@@ -16,6 +16,6 @@ surf_map = SurfaceMap(robot, client)
 map_thr = thr.Thread(target=surf_map.create_surface_map, args=())
 map_thr.start()
 
+
 sim = GuiControl(1200, 900, robot)
 sim.run()
-

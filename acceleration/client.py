@@ -105,7 +105,7 @@ class Client:
                 acc_x = 0
             if abs(acc_y) < 0.095:
                 acc_y = 0
-            print("                                                 Accel:", acc_x, acc_y)
+            # print("                                                 Accel:", acc_x, acc_y)
 
             vel_x = self.vel_proj[0] + acc_x * period
             vel_y = self.vel_proj[1] + acc_y * period
@@ -145,4 +145,4 @@ if __name__ == "__main__":
 
     while True:
         vel = pc.get_velocity()
-        print(vel)
+        # print(vel)
