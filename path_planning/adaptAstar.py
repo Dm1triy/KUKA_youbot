@@ -13,7 +13,7 @@ class Astar:
         self.nodes = np.array([self.start_point]).astype(np.uint32)
         # map with bool_map shape, -1 = unvisited, 0 = created
         self.node_map = np.ones(self.bool_map.shape).astype(np.int16)*-1
-        self.node_map[tuple(self.start_point)] = 0
+        self.node_map[self.start_point[1], self.start_point[0]] = 0
         self.graph = {0: [None, self.heuristic(self.start_point)]}     # node_index: [parent_node, cost]
         self.node_num = 1
 
@@ -25,24 +25,22 @@ class Astar:
         map_shape = self.bool_map.shape
         self.map_shape = (map_shape - np.ones(len(map_shape))).astype(np.uint32)    # even shape
         self.dist_reached = False
-        self.end_node = -1
         self.path = []
         self.graph_printed = False  # ??
 
         self.motion = self.get_motion_model()
 
-        if not start_point.any():
+        if start_point is None:
             print("No start point")
-        assert start_point.any()
-        if not end_point.any():
+        assert start_point is not None
+        if end_point is None:
             print("No end point")
-        assert end_point.any()
-        if not bin_map.any():
+        assert end_point is not None
+        if bin_map is None:
             print("No bin_map")
-        assert bin_map.any()
+        assert bin_map is not None
 
     def step(self):
-        deb = False
         best_node_index = self.best_node()
         x, y = self.nodes[best_node_index]
         parent_cost = self.graph[best_node_index][1]
@@ -52,10 +50,10 @@ class Astar:
             h = self.heuristic((new_x, new_y))
             res_f = h + move_cost
             if not self.is_obstacle(new_x, new_y):
-                if self.node_map[new_x][new_y] != 0:    # if unvisited
+                if self.node_map[new_y, new_x] != 0:    # if unvisited
                     self.graph[self.node_num] = [best_node_index, parent_cost + res_f]
                     self.nodes_queue[self.node_num] = parent_cost + res_f   # add to applicants
-                    self.node_map[new_x][new_y] = 0     # no longer unvisited
+                    self.node_map[new_y, new_x] = 0     # no longer unvisited
                     self.nodes = np.append(self.nodes, [[new_x, new_y]], axis=0)    # pos
                     self.node_num += 1
                 else:   # if already visited
@@ -67,12 +65,10 @@ class Astar:
                         if index in self.nodes_queue:
                             self.nodes_queue[index] = parent_cost + res_f
                 if (new_x, new_y) == tuple(self.end_point):
-                    self.end_node = self.node_num - 1
-                    print(deb)
                     self.dist_reached = True
 
     def get_path(self):
-        node_num = self.end_node
+        node_num = np.where((self.nodes == tuple(self.end_point)).all(axis=1))[0][0]
         self.path = []
         while node_num != 0:
             self.path.append(self.nodes[node_num])

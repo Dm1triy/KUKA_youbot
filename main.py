@@ -16,6 +16,10 @@ surf_map = SurfaceMap(robot, client)
 map_thr = thr.Thread(target=surf_map.create_surface_map, args=())
 map_thr.start()
 
+end_point = (6, 1)  # in meters
+path = PathPlanner(robot, surf_map)
+path.run_Astar(end_point, surface=False)
+path.run_Astar(base_point, surface=True)
 
 sim = GuiControl(1200, 900, robot)
 sim.run()

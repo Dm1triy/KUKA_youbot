@@ -266,6 +266,7 @@ class SurfaceMap:
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
 
     def get_weighted_map(self):
+        self.vel_thr.stop()
         return self.weighted_map
 
     def get_weight(self, x, y):
