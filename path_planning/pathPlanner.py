@@ -4,9 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib import collections as mc
-import threading as thr
-import math
-from adaptAstar import Astar
+from path_planning.adaptAstar import Astar
 
 
 class PathPlanner:
@@ -19,7 +17,7 @@ class PathPlanner:
         self.start_cell = self.map_width//2, self.map_height//2
         self.map = np.array([[0] * self.map_width] * self.map_height)
 
-    def run_Astar(self, target, weights=None, adapt=False):
+    def run_Astar(self, target, weights=None, surface=False):
         pos, _ = self.robot.lidar
         pos = self.pos2cell(pos)
         target = self.pos2cell(target)
@@ -30,11 +28,11 @@ class PathPlanner:
         c1 = ax.add_patch(pos_circle)
         ax.add_patch(target_circle)
 
-        if adapt:
-            index = np.where(weights > 1)
+        if surface:
+            index = np.where(weights == 1.6)
             ax.scatter(index[1], index[0], color='r', s=3)
 
-        alg = Astar(np.array(pos), np.array(target), self.map, adapt_weights=weights, adapt_flag=adapt)
+        alg = Astar(np.array(pos), np.array(target), self.map, adapt_weights=weights, adapt_flag=surface)
         i = 0
         while not alg.dist_reached:
             alg.step()
@@ -81,10 +79,10 @@ class PathPlanner:
 
     def move_along_path(self, path, ax):
         c2 = ax.add_patch(plt.Circle((path[0][-1], path[1][-1]), 1, color='b'))
-        for i in range(2, len(path[0])):
+        for i in range(2, len(path[0]), 5):
             next_pos = path[0][-i], path[1][-i]
             next_pos = self.cell2pos(next_pos)
-            self.robot.go_to(next_pos[0], next_pos[1])
+            self.robot.go_to(next_pos[0], next_pos[1], initial_speed=1)
             while self.robot.going_to_target_pos:
                 time.sleep(0.1)
             cur_pos, _ = self.robot.lidar

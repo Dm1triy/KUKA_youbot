@@ -11,4 +11,6 @@ struct = ndimage.generate_binary_structure(2, 2)
 #print(struct)
 
 new = ndimage.binary_dilation(new, structure=struct).astype(new.dtype)
+
+new = np.where(new == 1, 1.6, 1)
 print(new)

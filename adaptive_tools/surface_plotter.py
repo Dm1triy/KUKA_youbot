@@ -113,17 +113,15 @@ class SurfaceMap:
         pixel = hsv_map[pos[1], pos[0]]
         print("                 Color", hsv_map[pos[1], pos[0]])
 
-        lower_bound = np.array([pixel[0]-10, 60, 60])
-        upper_bound = np.array([pixel[0]+10, 255, 255])
+        lower_bound = np.array([pixel[0]-15, 60, 60])
+        upper_bound = np.array([pixel[0]+15, 255, 255])
 
         mask = cv.inRange(hsv_map, lower_bound, upper_bound)
-        # struct = np.ones((5, 5))
-        # mask = ndimage.binary_dilation(mask, structure=struct).astype(mask.dtype)
         self.weighted_map = self.weighted_map + weight*(mask/255)
 
     def process_vel(self, vel, pos, hsv):
         v = np.random.normal(vel, 0.05)
-        target_v = np.random.normal(0.3, 0.01)
+        target_v = np.random.normal(0.2, 0.01)
         purp = 170
         orng = 110
         l_t = np.array([orng-15, 60, 60])
@@ -261,11 +259,11 @@ class SurfaceMap:
                              (local_map.shape[1]//2) * np.sin(robot_ang)
             new_i = np.around(img_edge_x + new_i + diff_i).astype(int)
             new_j = np.around(img_edge_y + new_j - diff_j).astype(int)
-            # if (self.surface_map[new_j, new_i] == [100, 100, 100]).all() or \
-            # (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
+            if (self.surface_map[new_j, new_i] == [100, 100, 100]).all() or \
+            (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
             # dist = np.linalg.norm([robot_x-new_i, robot_y-new_j])
             # if dist > 50 or (self.surface_map[new_j, new_i] == [100, 100, 100]).all():
-            self.surface_map[new_j, new_i] = local_map[-i, -j]
+                self.surface_map[new_j, new_i] = local_map[-i, -j]
 
         self.surface_map = cv.medianBlur(self.surface_map, 3)
 
@@ -275,6 +273,8 @@ class SurfaceMap:
     def get_weighted_map(self):
         new_map = np.where(self.weighted_map > 1.4, 1, 0)
         struct = ndimage.generate_binary_structure(2, 2)
+        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
+        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
         new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
         new_map = np.where(new_map == 1, 1.6, 1)
         return new_map
