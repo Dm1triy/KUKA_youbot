@@ -3,8 +3,8 @@ import math
 
 
 class Astar:
-    def __init__(self, start_point=None,
-                 end_point=None, bin_map=None):
+    def __init__(self, start_point=None, end_point=None,
+                 bin_map=None, adapt_weights=None, adapt_flag=False):
         self.start_point = start_point
         self.end_point = end_point
         self.bool_map = bin_map
@@ -30,6 +30,11 @@ class Astar:
 
         self.motion = self.get_motion_model()
 
+        if adapt_flag:
+            self.adaptive_weights = adapt_weights
+        else:
+            self.adaptive_weights = np.zeros(self.bool_map.shape).astype(np.int16)
+
         if start_point is None:
             print("No start point")
         assert start_point is not None
@@ -48,7 +53,8 @@ class Astar:
             new_x = x + move_x
             new_y = y + move_y
             h = self.heuristic((new_x, new_y))
-            res_f = h + move_cost
+            adaptive_w = self.adaptive_weights[new_y, new_x]
+            res_f = h + move_cost + adaptive_w
             if not self.is_obstacle(new_x, new_y):
                 if self.node_map[new_y, new_x] != 0:    # if unvisited
                     self.graph[self.node_num] = [best_node_index, parent_cost + res_f]

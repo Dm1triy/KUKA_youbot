@@ -3,6 +3,8 @@ import cv2 as cv
 import skimage
 import time
 import threading as thr
+from scipy import ndimage
+
 from acceleration.client import Client
 from KUKA.KUKA import YouBot
 
@@ -103,8 +105,8 @@ class SurfaceMap:
                 img = cv.resize(map_with_robot, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
                 cv.imshow("map", img)
                 # img2 = cv.resize(self.mask, dsize=(1000, 1000), interpolation=cv.INTER_NEAREST)
-                # if self.mask is not None:
-                #     cv.imshow("mask", self.mask)
+                if self.mask is not None:
+                    cv.imshow("mask", self.mask)
             time.sleep(1)
 
     def update_weights(self, weight, hsv_map, pos):
@@ -115,15 +117,17 @@ class SurfaceMap:
         upper_bound = np.array([pixel[0]+10, 255, 255])
 
         mask = cv.inRange(hsv_map, lower_bound, upper_bound)
-        self.weighted_map = self.weighted_map + weight*mask/255
+        # struct = np.ones((5, 5))
+        # mask = ndimage.binary_dilation(mask, structure=struct).astype(mask.dtype)
+        self.weighted_map = self.weighted_map + weight*(mask/255)
 
     def process_vel(self, vel, pos, hsv):
         v = np.random.normal(vel, 0.1)
         target_v = np.random.normal(0.3, 0.05)
         purp = 170
         orng = 110
-        l_t = np.array([orng-10, 60, 60])
-        u_t = np.array([orng+10, 255, 255])
+        l_t = np.array([orng-15, 60, 60])
+        u_t = np.array([orng+15, 255, 255])
         threshold = cv.inRange(hsv, l_t, u_t)
         flag = threshold[pos[1], pos[0]]
         self.mask = threshold
@@ -254,11 +258,12 @@ class SurfaceMap:
                              (local_map.shape[1]//2) * np.sin(robot_ang)
             new_i = np.around(img_edge_x + new_i + diff_i).astype(int)
             new_j = np.around(img_edge_y + new_j - diff_j).astype(int)
-            if (self.surface_map[new_j, new_i] == [100, 100, 100]).all() or \
-            (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
+            # if (self.surface_map[new_j, new_i] == [100, 100, 100]).all() or \
+            # (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
+
             # dist = np.linalg.norm([robot_x-new_i, robot_y-new_j])
             # if dist > 20 or (self.surface_map[new_j, new_i] == [100, 100, 100]).all():
-                self.surface_map[new_j, new_i] = local_map[-i, j]
+            self.surface_map[new_j, new_i] = local_map[-i, -j]
 
         self.surface_map = cv.medianBlur(self.surface_map, 3)
 
@@ -266,7 +271,7 @@ class SurfaceMap:
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
 
     def get_weighted_map(self):
-        self.vel_thr.stop()
+
         return self.weighted_map
 
     def get_weight(self, x, y):
