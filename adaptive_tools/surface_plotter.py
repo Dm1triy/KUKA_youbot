@@ -122,8 +122,8 @@ class SurfaceMap:
         self.weighted_map = self.weighted_map + weight*(mask/255)
 
     def process_vel(self, vel, pos, hsv):
-        v = np.random.normal(vel, 0.1)
-        target_v = np.random.normal(0.3, 0.05)
+        v = np.random.normal(vel, 0.05)
+        target_v = np.random.normal(0.3, 0.01)
         purp = 170
         orng = 110
         l_t = np.array([orng-15, 60, 60])
@@ -249,6 +249,9 @@ class SurfaceMap:
         img_edge_x = int(arm_x + x_from_cam)
         img_edge_y = int(arm_y + y_from_cam)
 
+        # img_edge_x = int(arm_x)
+        # img_edge_y = int(arm_y)
+
         iter_x, iter_y = range(local_map.shape[0]), range(local_map.shape[1])
         for i, j in product(iter_x, iter_y):
             affine_mat = np.array([[np.cos(robot_ang), -np.sin(robot_ang)],
@@ -260,9 +263,8 @@ class SurfaceMap:
             new_j = np.around(img_edge_y + new_j - diff_j).astype(int)
             # if (self.surface_map[new_j, new_i] == [100, 100, 100]).all() or \
             # (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
-
             # dist = np.linalg.norm([robot_x-new_i, robot_y-new_j])
-            # if dist > 20 or (self.surface_map[new_j, new_i] == [100, 100, 100]).all():
+            # if dist > 50 or (self.surface_map[new_j, new_i] == [100, 100, 100]).all():
             self.surface_map[new_j, new_i] = local_map[-i, -j]
 
         self.surface_map = cv.medianBlur(self.surface_map, 3)
@@ -271,8 +273,11 @@ class SurfaceMap:
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
 
     def get_weighted_map(self):
-
-        return self.weighted_map
+        new_map = np.where(self.weighted_map > 1.4, 1, 0)
+        struct = ndimage.generate_binary_structure(2, 2)
+        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
+        new_map = np.where(new_map == 1, 1.6, 1)
+        return new_map
 
     def get_weight(self, x, y):
         return self.weighted_map[y, x]

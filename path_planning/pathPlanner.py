@@ -85,6 +85,8 @@ class PathPlanner:
             next_pos = path[0][-i], path[1][-i]
             next_pos = self.cell2pos(next_pos)
             self.robot.go_to(next_pos[0], next_pos[1])
+            while self.robot.going_to_target_pos:
+                time.sleep(0.1)
             cur_pos, _ = self.robot.lidar
             cur_pos = self.pos2cell(cur_pos)
             c2.remove()
@@ -116,6 +118,7 @@ if __name__ == "__main__":
         def __init__(self):
             # self.pos = np.random.uniform(-3, 3, 2)
             self.pos = 0, 0
+            self.going_to_target_pos = False
 
         def go_to(self, x, y):
             time.sleep(0.1)
