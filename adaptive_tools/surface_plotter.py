@@ -21,10 +21,12 @@ class SurfaceMap:
         self.cell_size = 0.05   # meters
         self.map_width = 401
         self.map_height = 401
-        self.surface_map = np.array([[[100, 100, 100]] * self.map_width] * self.map_height, dtype=np.uint8)
+        self.surface_map = np.array([[[190, 80, 20]] * self.map_width] * self.map_height, dtype=np.uint8)
         self.start_x, self.start_y = self.map_width//2, self.map_height//2
 
-        self.weighted_map = np.array([1 * self.map_width] * self.map_height, dtype=np.uint8)
+        #self.weighted_map = np.array([1 * self.map_width] * self.map_height, dtype=np.uint8)
+        self.weighted_map = np.ones((self.map_width, self.map_height))
+
 
         # camera params
         self.vert_FoV = np.radians(40)
@@ -42,7 +44,7 @@ class SurfaceMap:
             # robot values in the moment
             self.floor_img = self.robot.camera()
             self.angles = self.robot.arm
-            self.robot_pos, _ = self.robot.lidar
+            self.robot_pos = self.robot.increment
             self.running = True
             self.vel_thr = thr.Thread(target=self.update_map, args=())
             self.vel_lock = thr.Lock()
@@ -63,17 +65,19 @@ class SurfaceMap:
             while self.vel_counter == self.robot.odom_speed_counter:
                 time.sleep(0.02)
             self.odom_velocity = self.robot.move_speed     # Vx, Vy, rotation
-            pos, _ = self.robot.lidar
+            pos = self.robot.increment
             self.vel_counter = self.robot.odom_speed_counter
 
             map_x, map_y = self.pos_to_cell(pos[0], pos[1])
             self.vel_lock.acquire()
             hsv_map = cv.cvtColor(self.surface_map, cv.COLOR_RGB2HSV)
+            rgb_map = self.surface_map
+            gray_map = cv.cvtColor(self.surface_map, cv.COLOR_RGB2GRAY)
             self.vel_lock.release()
 
             abs_vel_odom = np.linalg.norm([2*self.odom_velocity[0], 2*self.odom_velocity[1]])
             if naebka:
-                self.accel_velocity, abs_vel_odom = self.process_vel(abs_vel_odom, (map_x, map_y), hsv_map)
+                self.accel_velocity, abs_vel_odom = self.process_vel(abs_vel_odom, (map_x, map_y), hsv_map, rgb_map, gray_map)
 
             print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
 
@@ -88,7 +92,7 @@ class SurfaceMap:
             self.running = cv.waitKey(40) != 27
             self.floor_img = self.robot.camera()
             self.angles = self.robot.arm
-            self.robot_pos, _ = self.robot.lidar
+            self.robot_pos = self.robot.increment
 
             cam_coords = self.forward_kinematics()
             self.arm_pos = cam_coords[:3]
@@ -109,6 +113,16 @@ class SurfaceMap:
                     cv.imshow("mask", self.mask)
             time.sleep(1)
 
+    def get_weighted_map(self):
+        new_map = np.where(self.weighted_map > 1.4, 20, 0)
+
+        struct = ndimage.generate_binary_structure(2, 2)
+        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
+        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
+        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
+        new_map = np.where(new_map == 1, 20, 1)
+        return new_map
+
     def update_weights(self, weight, hsv_map, pos):
         pixel = hsv_map[pos[1], pos[0]]
         print("                 Color", hsv_map[pos[1], pos[0]])
@@ -117,19 +131,23 @@ class SurfaceMap:
         upper_bound = np.array([pixel[0]+15, 255, 255])
 
         mask = cv.inRange(hsv_map, lower_bound, upper_bound)
-        self.weighted_map = self.weighted_map + weight*(mask/255)
+        mask = weight * mask/255
+        reverse_mask = (mask-1)*(-1)
+        self.weighted_map = self.weighted_map * reverse_mask
+        self.weighted_map = self.weighted_map + weight * mask
 
-    def process_vel(self, vel, pos, hsv):
+    def process_vel(self, vel, pos, hsv, rgb, gray):
         v = np.random.normal(vel, 0.05)
         target_v = np.random.normal(0.2, 0.01)
-        purp = 170
-        orng = 110
-        l_t = np.array([orng-15, 60, 60])
-        u_t = np.array([orng+15, 255, 255])
-        threshold = cv.inRange(hsv, l_t, u_t)
+        # purp = 170
+        # orng = 110
+        # l_t = np.array([orng-15, 60, 60])
+        # u_t = np.array([orng+15, 255, 255])
+        # threshold = cv.inRange(hsv, l_t, u_t)
+        threshold = cv.inRange(gray, 0, 60)
+
         flag = threshold[pos[1], pos[0]]
         self.mask = threshold
-
         if flag:
             return target_v, 1
         else:
@@ -244,11 +262,11 @@ class SurfaceMap:
         x_from_cam = dist_from_cam / self.cell_size * np.cos(robot_ang)
         y_from_cam = dist_from_cam / self.cell_size * np.sin(robot_ang)
 
-        img_edge_x = int(arm_x + x_from_cam)
-        img_edge_y = int(arm_y + y_from_cam)
+        # img_edge_x = int(arm_x + x_from_cam)
+        # img_edge_y = int(arm_y + y_from_cam)
 
-        # img_edge_x = int(arm_x)
-        # img_edge_y = int(arm_y)
+        img_edge_x = int(arm_x)
+        img_edge_y = int(arm_y)
 
         iter_x, iter_y = range(local_map.shape[0]), range(local_map.shape[1])
         for i, j in product(iter_x, iter_y):
@@ -259,7 +277,11 @@ class SurfaceMap:
                              (local_map.shape[1]//2) * np.sin(robot_ang)
             new_i = np.around(img_edge_x + new_i + diff_i).astype(int)
             new_j = np.around(img_edge_y + new_j - diff_j).astype(int)
-            if (self.surface_map[new_j, new_i] == [100, 100, 100]).all() or \
+
+            if new_i >= self.map_width or new_j >= self.map_height:
+                continue
+
+            if (self.surface_map[new_j, new_i] == [190, 80, 20]).all() or \
             (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
             # dist = np.linalg.norm([robot_x-new_i, robot_y-new_j])
             # if dist > 50 or (self.surface_map[new_j, new_i] == [100, 100, 100]).all():
@@ -269,15 +291,6 @@ class SurfaceMap:
 
     def pos_to_cell(self, x, y):
         return int(self.start_x + x / self.cell_size), int(self.start_y - y / self.cell_size)
-
-    def get_weighted_map(self):
-        new_map = np.where(self.weighted_map > 1.4, 1, 0)
-        struct = ndimage.generate_binary_structure(2, 2)
-        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
-        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
-        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
-        new_map = np.where(new_map == 1, 1.6, 1)
-        return new_map
 
     def get_weight(self, x, y):
         return self.weighted_map[y, x]

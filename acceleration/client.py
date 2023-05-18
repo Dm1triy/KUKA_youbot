@@ -141,8 +141,8 @@ class Client:
 
 
 if __name__ == "__main__":
-    pc = Client(host='192.168.88.24', info=False)
+    pc = Client(host='192.168.88.21', info=False)
 
     while True:
         vel = pc.get_velocity()
-        # print(vel)
+        print(vel)

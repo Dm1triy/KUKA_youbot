@@ -18,7 +18,7 @@ class PathPlanner:
         self.map = np.array([[0] * self.map_width] * self.map_height)
 
     def run_Astar(self, target, weights=None, surface=False):
-        pos, _ = self.robot.lidar
+        pos = self.robot.increment
         pos = self.pos2cell(pos)
         target = self.pos2cell(target)
 
@@ -29,7 +29,7 @@ class PathPlanner:
         ax.add_patch(target_circle)
 
         if surface:
-            index = np.where(weights == 1.6)
+            index = np.where(weights == 20)
             ax.scatter(index[1], index[0], color='r', s=3)
 
         alg = Astar(np.array(pos), np.array(target), self.map, adapt_weights=weights, adapt_flag=surface)
@@ -82,10 +82,11 @@ class PathPlanner:
         for i in range(2, len(path[0]), 5):
             next_pos = path[0][-i], path[1][-i]
             next_pos = self.cell2pos(next_pos)
-            self.robot.go_to(next_pos[0], next_pos[1], initial_speed=1)
+            print("                                                 next", next_pos)
+            self.robot.go_to(next_pos[0], next_pos[1], initial_speed=1, k=6, prec=0.05)
             while self.robot.going_to_target_pos:
                 time.sleep(0.1)
-            cur_pos, _ = self.robot.lidar
+            cur_pos = self.robot.increment
             cur_pos = self.pos2cell(cur_pos)
             c2.remove()
             c2 = ax.add_patch(plt.Circle(cur_pos, 1, color='b'))
@@ -115,10 +116,10 @@ if __name__ == "__main__":
     class Robot:
         def __init__(self):
             # self.pos = np.random.uniform(-3, 3, 2)
-            self.pos = 0, 0
+            self.pos = 0, 3
             self.going_to_target_pos = False
 
-        def go_to(self, x, y):
+        def go_to(self, x, y, initial_speed=0.5):
             time.sleep(0.1)
             self.pos = x, y
 
@@ -128,8 +129,9 @@ if __name__ == "__main__":
 
     robot = Robot()
     pp = PathPlanner(robot)
-    goal = 0, 3
+    goal = 0, 0
     # weights = np.random.uniform(1, 10, (401, 401))
     weights = np.ones((401, 401))
+    print(np.amax(weights))
     weights[161:181, 191:211] = 100
     pp.run_Astar(goal, weights, True)

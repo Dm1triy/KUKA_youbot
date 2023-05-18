@@ -6,7 +6,7 @@ import threading as thr
 
 
 class Server:
-    def __init__(self, host='192.168.88.24', port=6543, info=True):
+    def __init__(self, host='192.168.88.21', port=6543, info=True):
         self.info = info
         self.accel_stream = Accel()
 
