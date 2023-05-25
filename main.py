@@ -13,19 +13,19 @@ ip = '192.168.88.21'
 
 client = Client(host=ip, info=False)
 
-robot = YouBot(ip, ros=False, offline=False, camera_enable=True, advanced=False)
+robot = YouBot(ip, ros=True, offline=False, camera_enable=True, advanced=False)
 
 surf_map = SurfaceMap(robot, client)
 map_thr = thr.Thread(target=surf_map.create_surface_map, args=())
 map_thr.start()
 
-# end_point = (2.5, 0)  # in meters
-# path = PathPlanner(robot)
-# path.run_Astar(end_point, surface=False)
-# weights = surf_map.get_weighted_map()
+end_point = (3, 0)  # in meters
+path = PathPlanner(robot)
+path.run_Astar(end_point, surface=False)
+weights = surf_map.get_weighted_map()
 
-# base_point = (0, 0)
-# path.run_Astar(base_point, weights=weights, surface=True)
+base_point = (0, 0)
+path.run_Astar(base_point, weights=weights, surface=True)
 
 sim = GuiControl(1200, 900, robot)
 sim.run()

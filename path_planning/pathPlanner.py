@@ -83,7 +83,7 @@ class PathPlanner:
             next_pos = path[0][-i], path[1][-i]
             next_pos = self.cell2pos(next_pos)
             print("                                                 next", next_pos)
-            self.robot.go_to(next_pos[0], next_pos[1], initial_speed=1, k=6, prec=0.05)
+            self.robot.go_to(next_pos[0], next_pos[1], initial_speed=1, k=2, prec=0.05)
             while self.robot.going_to_target_pos:
                 time.sleep(0.1)
             cur_pos = self.robot.increment

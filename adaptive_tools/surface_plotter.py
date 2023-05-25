@@ -114,21 +114,32 @@ class SurfaceMap:
             time.sleep(1)
 
     def get_weighted_map(self):
-        new_map = np.where(self.weighted_map > 1.4, 20, 0)
+        new_map = np.where(self.weighted_map > 1.4, 1, 0)
 
         struct = ndimage.generate_binary_structure(2, 2)
-        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
-        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
-        new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
+        struct[:, 2] = False
+        for i in range(12):
+            new_map = ndimage.binary_dilation(new_map, structure=struct).astype(new_map.dtype)
+        # struct2 = np.zeros((3, 3)).astype(bool)
+        # struct2[1, 0:2] = True
+        # for i in range(2):
+        #     new_map = ndimage.binary_dilation(new_map, structure=struct2).astype(new_map.dtype)
+        struct3 = np.zeros((3, 3)).astype(bool)
+        struct3[1, 1:] = True
+        for i in range(10):
+            new_map = ndimage.binary_erosion(new_map, structure=struct3).astype(new_map.dtype)
+
         new_map = np.where(new_map == 1, 20, 1)
         return new_map
 
     def update_weights(self, weight, hsv_map, pos):
         pixel = hsv_map[pos[1], pos[0]]
-        print("                 Color", hsv_map[pos[1], pos[0]])
-
-        lower_bound = np.array([pixel[0]-15, 60, 60])
-        upper_bound = np.array([pixel[0]+15, 255, 255])
+        if pixel[2] > 60:
+            lower_bound = np.array([pixel[0]-15, 60, 60])
+            upper_bound = np.array([pixel[0]+15, 255, 255])
+        elif pixel[2] < 60:
+            lower_bound = np.array([0, 0, 0])
+            upper_bound = np.array([180, 255, 60])
 
         mask = cv.inRange(hsv_map, lower_bound, upper_bound)
         mask = weight * mask/255
@@ -144,7 +155,12 @@ class SurfaceMap:
         # l_t = np.array([orng-15, 60, 60])
         # u_t = np.array([orng+15, 255, 255])
         # threshold = cv.inRange(hsv, l_t, u_t)
-        threshold = cv.inRange(gray, 0, 60)
+        # threshold = cv.inRange(gray, 0, 6)
+
+        # for gray color
+        l_t = np.array([0, 0, 0])
+        u_t = np.array([180, 255, 60])
+        threshold = cv.inRange(hsv, l_t, u_t)
 
         flag = threshold[pos[1], pos[0]]
         self.mask = threshold
@@ -281,10 +297,11 @@ class SurfaceMap:
             if new_i >= self.map_width or new_j >= self.map_height:
                 continue
 
-            if (self.surface_map[new_j, new_i] == [190, 80, 20]).all() or \
+            # if (self.surface_map[new_j, new_i] == [190, 80, 20]).all() or \
+            # (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
+            dist = np.linalg.norm([robot_x-new_i, robot_y-new_j])
+            if dist > 50 or (self.surface_map[new_j, new_i] == [190, 80, 20]).all() or \
             (self.surface_map[new_j, new_i] == [190, 70, 20]).all():
-            # dist = np.linalg.norm([robot_x-new_i, robot_y-new_j])
-            # if dist > 50 or (self.surface_map[new_j, new_i] == [100, 100, 100]).all():
                 self.surface_map[new_j, new_i] = local_map[-i, -j]
 
         self.surface_map = cv.medianBlur(self.surface_map, 3)
