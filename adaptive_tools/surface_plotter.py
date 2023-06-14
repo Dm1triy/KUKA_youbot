@@ -58,7 +58,7 @@ class SurfaceMap:
         self.arm_pos = cam_coords[:3]
         self.arm_angle = np.radians(cam_coords[-1])
 
-    def update_map(self, naebka=True):
+    def update_map(self, color=True):
         while self.running:
             # Get velocities and pos
             self.accel_velocity = self.client.get_velocity()    # absolute velocity
@@ -76,7 +76,7 @@ class SurfaceMap:
             self.vel_lock.release()
 
             abs_vel_odom = np.linalg.norm([2*self.odom_velocity[0], 2*self.odom_velocity[1]])
-            if naebka:
+            if color:
                 self.accel_velocity, abs_vel_odom = self.process_vel(abs_vel_odom, (map_x, map_y), hsv_map, rgb_map, gray_map)
 
             print(f"Accel_vel = {self.accel_velocity},      Odom_vel = {abs_vel_odom}")
